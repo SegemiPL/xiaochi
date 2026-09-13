@@ -299,8 +299,9 @@ def test_jurisdiction_policy_and_official_domain_matching():
     policy = load_jurisdiction_search_policy("CN")
 
     assert policy is not None
-    assert policy.engines == ["bing", "baidu", "sogou"]
+    assert policy.engines == ["duckduckgo", "bing"]
     assert is_official_url("https://sub.safe.gov.cn/policy", policy.official_domains)
+    assert is_official_url("https://szs.mof.gov.cn/policy", policy.official_domains)
     assert not is_official_url("https://safe.gov.cn.example.com/fake", policy.official_domains)
 
 
@@ -317,9 +318,23 @@ def test_supervisor_reuses_an_existing_daemon(monkeypatch):
 
     supervisor = OpenWebSearchSupervisor(WebSearchSettings())
     monkeypatch.setattr(supervisor, "_daemon_ready", lambda: True)
+    monkeypatch.setattr(supervisor, "_daemon_proxy_compatible", lambda: True)
 
     assert supervisor.start() is False
     assert supervisor.owns_process is False
+
+
+def test_supervisor_rejects_stale_daemon_without_required_proxy(monkeypatch):
+    from src.websearch.supervisor import OpenWebSearchSupervisor
+
+    monkeypatch.setenv("https_proxy", "http://127.0.0.1:7890")
+    monkeypatch.delenv("USE_PROXY", raising=False)
+    supervisor = OpenWebSearchSupervisor(WebSearchSettings())
+    monkeypatch.setattr(supervisor, "_daemon_ready", lambda: True)
+    monkeypatch.setattr(supervisor, "_daemon_proxy_compatible", lambda: False)
+
+    with pytest.raises(RuntimeError, match="incompatible proxy settings"):
+        supervisor.start()
 
 
 def test_supervisor_starts_and_stops_its_owned_daemon(monkeypatch, tmp_path):
@@ -332,6 +347,7 @@ def test_supervisor_starts_and_stops_its_owned_daemon(monkeypatch, tmp_path):
 
     class FakeProcess:
         def __init__(self):
+            self.pid = 4242
             self.returncode = None
             self.terminated = False
 
@@ -365,10 +381,115 @@ def test_supervisor_starts_and_stops_its_owned_daemon(monkeypatch, tmp_path):
     assert supervisor.start() is True
     assert invocation["args"][-4:] == ["--host", "127.0.0.1", "--port", "3210"]
     assert supervisor.owns_process is True
+    assert (tmp_path / "workspace" / "open-websearch.pid.json").is_file()
 
     supervisor.stop()
     assert process.terminated is True
     assert supervisor.owns_process is False
+    assert not (tmp_path / "workspace" / "open-websearch.pid.json").exists()
+
+
+def test_supervisor_recovers_only_a_recorded_orphan(monkeypatch, tmp_path):
+    import src.websearch.supervisor as supervisor_module
+    from src.websearch.supervisor import OpenWebSearchSupervisor
+
+    executable = tmp_path / "infra" / "open-websearch" / "node_modules" / ".bin"
+    executable.mkdir(parents=True)
+    executable = executable / "open-websearch"
+    executable.touch()
+    pid_file = tmp_path / "workspace" / "open-websearch.pid.json"
+    pid_file.parent.mkdir(parents=True)
+    pid_file.write_text(
+        json.dumps(
+            {
+                "daemon_pid": 4242,
+                "supervisor_pid": 3131,
+                "executable": str(executable.resolve()),
+                "host": "127.0.0.1",
+                "port": 3210,
+            }
+        ),
+        encoding="utf-8",
+    )
+    signalled = []
+
+    monkeypatch.setattr(supervisor_module, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(supervisor_module, "_process_exists", lambda pid: False)
+    monkeypatch.setattr(supervisor_module, "_command_matches_daemon", lambda *args: True)
+    monkeypatch.setattr(supervisor_module.os, "kill", lambda pid, sig: signalled.append((pid, sig)))
+    supervisor = OpenWebSearchSupervisor(WebSearchSettings())
+    monkeypatch.setattr(supervisor, "_daemon_ready", lambda: False)
+
+    assert supervisor._restart_recorded_orphan() is True
+    assert signalled == [(4242, supervisor_module.signal.SIGTERM)]
+    assert not pid_file.exists()
+
+
+def test_supervisor_never_interrupts_daemon_with_live_owner(monkeypatch, tmp_path):
+    import src.websearch.supervisor as supervisor_module
+    from src.websearch.supervisor import OpenWebSearchSupervisor
+
+    pid_file = tmp_path / "workspace" / "open-websearch.pid.json"
+    pid_file.parent.mkdir(parents=True)
+    pid_file.write_text(
+        json.dumps({"daemon_pid": 4242, "supervisor_pid": 3131}), encoding="utf-8"
+    )
+    monkeypatch.setattr(supervisor_module, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(supervisor_module, "_process_exists", lambda pid: True)
+    monkeypatch.setattr(
+        supervisor_module.os,
+        "kill",
+        lambda *args: pytest.fail("a daemon with a live owner must not be signalled"),
+    )
+
+    assert OpenWebSearchSupervisor(WebSearchSettings())._restart_recorded_orphan() is False
+
+
+def test_supervisor_translates_standard_http_proxy_for_daemon(monkeypatch, tmp_path):
+    import src.websearch.supervisor as supervisor_module
+    from src.websearch.supervisor import OpenWebSearchSupervisor
+
+    executable = tmp_path / "infra" / "open-websearch" / "node_modules" / ".bin"
+    executable.mkdir(parents=True)
+    (executable / "open-websearch").touch()
+    invocation = {}
+
+    class FakeProcess:
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, timeout):
+            return 0
+
+    def fake_popen(args, **kwargs):
+        invocation["env"] = kwargs["env"]
+        return FakeProcess()
+
+    monkeypatch.setenv("https_proxy", "http://127.0.0.1:7890")
+    monkeypatch.delenv("USE_PROXY", raising=False)
+    monkeypatch.delenv("PROXY_URL", raising=False)
+    monkeypatch.setattr(supervisor_module, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(supervisor_module.subprocess, "Popen", fake_popen)
+    supervisor = OpenWebSearchSupervisor(WebSearchSettings(startup_timeout_seconds=1))
+    readiness = iter((False, True))
+    monkeypatch.setattr(supervisor, "_daemon_ready", lambda: next(readiness))
+
+    assert supervisor.start() is True
+    assert invocation["env"]["USE_PROXY"] == "true"
+    assert invocation["env"]["PROXY_URL"] == "http://127.0.0.1:7890"
+    supervisor.stop()
+
+
+def test_explicit_proxy_opt_out_wins(monkeypatch):
+    from src.websearch.supervisor import _apply_proxy_compatibility
+
+    env = {"USE_PROXY": "false", "https_proxy": "http://127.0.0.1:7890"}
+    _apply_proxy_compatibility(env)
+
+    assert env == {"USE_PROXY": "false", "https_proxy": "http://127.0.0.1:7890"}
 
 
 def test_qwen_search_tool_marks_and_prioritizes_official_results(monkeypatch):
@@ -624,14 +745,14 @@ def test_qwen_search_tool_enforces_run_budget(monkeypatch):
             return SearchResponse(
                 query=query,
                 engines=kwargs["engines"],
-                results=[SearchResult("IRS", "https://www.irs.gov/payments", "", "bing", "web")],
+                results=[SearchResult(query, "https://www.irs.gov/payments", query, "bing", "web")],
             )
 
     tool.client = FakeClient()
-    assert json.loads(tool.call({"query": "a", "jurisdiction": "US"}))["status"] == "ok"
-    assert json.loads(tool.call({"query": "b", "jurisdiction": "US"}))["status"] == "ok"
+    assert json.loads(tool.call({"query": "alpha", "jurisdiction": "US"}))["status"] == "ok"
+    assert json.loads(tool.call({"query": "bravo", "jurisdiction": "US"}))["status"] == "ok"
 
-    payload = json.loads(tool.call({"query": "c", "jurisdiction": "US"}))
+    payload = json.loads(tool.call({"query": "charlie", "jurisdiction": "US"}))
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "search_budget_exhausted"
     assert "STOP searching" in payload["error"]["message"]

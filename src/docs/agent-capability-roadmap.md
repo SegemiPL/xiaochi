@@ -46,12 +46,12 @@
 
 | 编号 | 能力 | 状态 | 最后更新 | 实现证据与缺口 |
 |---|---|---|---|---|
-| BASE-01 | 来源注册表优先、搜索相关性过滤、官方域自适应重试、失败引擎降级 | 🟡 部分实现 | 2026-09-12 | `src/websearch/relevance.py`、`src/websearch/registry.py`、`src/tools/web_search.py`、`src/agent/judge.py`（LLM 二审）、`src/tests/test_search_strategy.py`、`src/tests/test_search_judge.py`；已通过相关回归测试；baidu/sogou 因 agent 流量下持续失败（302/反爬）已禁用，CN 默认仅 bing；尚未纳入完整 eval 数据集，LLM 二审未经真实模型运行验证 |
+| BASE-01 | 来源注册表优先、搜索相关性过滤、官方域自适应重试、失败引擎降级 | 🟡 部分实现 | 2026-09-13 | `src/websearch/relevance.py`、`src/websearch/registry.py`、`src/websearch/supervisor.py`、`src/tools/web_search.py`、`src/agent/judge.py`（LLM 二审）、`src/tests/test_search_strategy.py`、`src/tests/test_search_judge.py`、`src/tests/test_open_websearch.py`；已增加法规标题精确查询、近义重试熔断、主管机关域相关性约束、中英文来源别名、标准 HTTP 代理兼容及孤儿 daemon 安全接管；真实复测中 DuckDuckGo 对精确政策标题返回 3 条税务局官方页面，Bing 301 被隔离为部分失败；尚未纳入完整 eval 数据集和商业 API 兜底 |
 | BASE-02 | 官方 URL 来源追踪与抓取限制 | 🟡 部分实现 | 2026-09-11 | `src/websearch/provenance.py`、`src/tools/web_fetch.py`；可阻止猜测 URL，但长文档无法分段回读 |
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
 | BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-09-11 | `src/agent/conversations.py` 保存消息；尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-09-12 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；现有自动化测试覆盖 |
+| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-09-13 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；WebUI 使用宽幅响应式三栏布局，以弹性主对话区和降噪侧栏突出对话；`src/tests/test_webui_display.py` 覆盖布局样式钩子与断点 |
 
 ## 5. 待实现能力
 
@@ -328,6 +328,15 @@
 ## 7. 实现记录
 
 按时间倒序追加。每条记录应关联能力编号、代码或测试证据，并说明状态变化。
+
+### 2026-09-13
+
+- `BASE-01`：对 open-webSearch 做逐引擎真实对照：无代理 Bing 对“外籍个人/外商投资企业/股息红利”返回整页抖音，Startpage 超时；本机 HTTP 代理下 DuckDuckGo 首屏直接返回财政部公告2026年第27号、税务总局报道及地方税务原文。启动器现将标准 `HTTPS_PROXY`/`HTTP_PROXY` 显式转换为 open-webSearch 的 `USE_PROXY`/`PROXY_URL`（支持显式退出），CN 默认改为 DuckDuckGo 优先、Bing 备份，补充 `mof.gov.cn` 官方域；发现既有 daemon 的代理状态不一致时拒绝静默复用。非官方幸存结果质量由 `usable` 降为 `leads_only`，防止 Agent 把二手文章当可用证据。新增 supervisor、法域和质量语义测试；状态保持“部分实现”，商业 API 兜底尚未接入。
+- `BASE-01`：修复代理设置变更后旧 open-webSearch 进程成为 PPID 1 孤儿、下次启动被一致性保护阻断的问题。`src/websearch/supervisor.py` 为项目自启 daemon 保存 PID、父进程、可执行文件、host/port 身份，仅在父进程已死且命令完全匹配时自动重启；活跃实例和未知进程绝不终止。`src/tests/test_open_websearch.py` 覆盖记录清理、安全接管和活跃 owner 保护。真实启动状态确认 `useProxy: true`，精确标题复测返回上海、四川、北京税务局 3 条官方结果，Bing 301 仅记录为部分失败。
+- `BASE-01`、`BASE-06`：根据问题 1 的真实 WebUI 运行日志修复两类失控。搜索边界现会把未加书名号、但形态完整的法规标题自动转换为双引号精确查询；统一模型边界会校验 Nous/native 工具调用，并在上游丢失原始文本前恢复常见的缺引号、换行和尾逗号格式，只修复可无歧义恢复的工具名和 JSON 对象参数，其余调用不执行并自动要求模型重试一次。同时按重复句段频次识别任意周期的规划循环，一旦命中立即关闭流并触发一次干净重试，防止规划文本从数百 tokens 膨胀至万级。新增 `src/tests/test_search_strategy.py`、`src/tests/test_tool_call_compat.py` 与 `src/tests/test_robust_nous.py` 回归覆盖；第二轮真实本地模型复测已确认原始工具调用修复有效，重复生成检测按新日志继续加固，状态保持不变，等待最终回答级 smoke 验收。
+- `BASE-01`：针对 CLI 长自然语言查询持续召回词形垃圾的问题，`WebSearchTool` 明确要求已知文件标题使用双引号精确查询，并在工具边界自动把 `《文件全称》` 提取为精确标题加文号；新增运行内近义查询熔断。官方域重试改为优先使用来源注册表推断的主管机关，原始 `*.gov.cn` 结果只有达到主题相关性下限才可提供候选域，避免税务查询被 `dxs.moe.gov.cn` 劫持；CN 税务来源补充中文别名。新增对应搜索策略回归测试，状态保持“部分实现”，等待真实模型 smoke 验证。
+- `BASE-06`：重构 WebUI 的视觉布局。桌面端使用 1880px 宽幅容器、固定窄侧栏与弹性主对话区，主对话增加独立卡片层级、轻量强调线和输入框焦点；侧栏统一卡片、间距、阴影与头像尺度，并在 1020px/760px 断点下分别重排右栏和移动端内容顺序。新增 `src/tests/test_webui_display.py` 布局契约测试，状态保持“已完成”。
+- `BASE-06`：移除主对话区底部独立的 Gradio 语音录制栏，以空 `gr.State` 继续满足上游消息回调参数契约；文字输入、附件上传与会话保存路径保持不变，并补充 WebUI 源码契约测试。
 
 ### 2026-09-12
 

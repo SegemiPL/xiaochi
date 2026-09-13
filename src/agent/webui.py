@@ -381,11 +381,11 @@ class ThemedWebUI(WebUI):
         )
 
         header_html = """
-<div style="display:flex;align-items:center;gap:12px;padding:4px 8px 14px;border-bottom:1px solid var(--w3-border);margin-bottom:14px">
-  <img src="__LOGO__" alt="3wagent logo" style="width:34px;height:34px;border-radius:8px;display:block">
-  <div>
-    <div style="font-size:16px;font-weight:600;color:var(--w3-text);letter-spacing:-0.01em">3wagent</div>
-    <div style="font-size:12px;color:var(--w3-text-2)">跨境政策合规分析助手</div>
+<div class="w3-header">
+  <img class="w3-header-logo" src="__LOGO__" alt="3wagent logo">
+  <div class="w3-header-copy">
+    <div class="w3-header-name">3wagent</div>
+    <div class="w3-header-tagline">跨境政策合规分析助手</div>
   </div>
   <button id="w3-theme-toggle" type="button" title="切换明暗模式" aria-label="切换明暗模式">☾</button>
 </div>
@@ -477,8 +477,9 @@ class ThemedWebUI(WebUI):
             conversation_id = gr.State(None)
             with ms.Application():
                 gr.HTML(header_html)
-                with gr.Row(elem_classes='container'):
-                    with gr.Column(scale=1, elem_classes='w3-sidebar'):
+                with gr.Row(elem_classes=['container', 'w3-workspace']):
+                    with gr.Column(scale=1, min_width=210,
+                                   elem_classes=['w3-sidebar', 'w3-sidebar-left']):
                         gr.HTML("<div class='w3-sidebar-title'>对话</div>")
                         new_conversation_button = gr.Button(
                             '＋ 新对话',
@@ -503,7 +504,7 @@ class ThemedWebUI(WebUI):
                         # roots only when the content changed (no flicker).
                         status_val = gr.Textbox(visible=False, elem_id='w3-status-val')
                         results_val = gr.Textbox(visible=False, elem_id='w3-results-val')
-                    with gr.Column(scale=4):
+                    with gr.Column(scale=6, min_width=0, elem_classes='w3-chat-stage'):
                         chatbot = mgr.Chatbot(value=convert_history_to_chatbot(messages=messages),
                                               avatar_images=[
                                                   self.user_config,
@@ -513,6 +514,7 @@ class ThemedWebUI(WebUI):
                                               avatar_image_width=80,
                                               flushing=False,
                                               show_copy_button=True,
+                                              elem_classes='w3-chatbot',
                                               latex_delimiters=[{
                                                   'left': '\\(',
                                                   'right': '\\)',
@@ -543,13 +545,16 @@ class ThemedWebUI(WebUI):
                                                   'display': True
                                               }])
 
-                        input = mgr.MultimodalInput(placeholder=self.input_placeholder, )
-                        audio_input = gr.Audio(
-                            sources=['microphone'],
-                            type='filepath'
+                        input = mgr.MultimodalInput(
+                            placeholder=self.input_placeholder,
+                            elem_classes='w3-chat-input',
                         )
+                        # Keep the vendor callback's audio argument without
+                        # rendering a separate microphone panel in the UI.
+                        audio_input = gr.State(None)
 
-                    with gr.Column(scale=1):
+                    with gr.Column(scale=1, min_width=210,
+                                   elem_classes=['w3-sidebar', 'w3-sidebar-right']):
                         if len(self.agent_list) > 1:
                             agent_selector = gr.Dropdown(
                                 [(agent.name, i) for i, agent in enumerate(self.agent_list)],

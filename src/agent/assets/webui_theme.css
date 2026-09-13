@@ -25,6 +25,9 @@
   --w3-code-inline: rgba(9, 105, 218, 0.9);
   --w3-code-inline-bg: rgba(175, 184, 193, 0.2);
   --w3-green: #1a7f37;
+  --w3-chat-shadow: 0 20px 45px rgba(31, 35, 40, 0.09),
+    0 2px 8px rgba(31, 35, 40, 0.05);
+  --w3-side-shadow: 0 4px 16px rgba(31, 35, 40, 0.045);
 
   --body-background-fill: var(--w3-bg);
   --body-text-color: var(--w3-text);
@@ -114,6 +117,9 @@
   --w3-code-inline: #79c0ff;
   --w3-code-inline-bg: rgba(110, 118, 129, 0.18);
   --w3-green: #3fb950;
+  --w3-chat-shadow: 0 22px 54px rgba(0, 0, 0, 0.34),
+    0 2px 10px rgba(0, 0, 0, 0.24);
+  --w3-side-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
 
   --checkbox-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%233fb950' d='M6.2 12.2 2.4 8.4l1.1-1.1 2.7 2.7 6-6 1.1 1.1z'/%3E%3C/svg%3E");
 
@@ -127,12 +133,11 @@ body {
 }
 
 .gradio-container {
-  max-width: 1560px !important;
-  width: min(1560px, calc(100% - 48px)) !important;
+  max-width: 1880px !important;
+  width: min(1880px, calc(100% - 32px)) !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  padding-left: 24px !important;
-  padding-right: 24px !important;
+  padding: 16px 8px 24px !important;
 }
 
 .gradio-container .main,
@@ -159,6 +164,97 @@ body {
    and loses the conversation; use the header toggle instead) */
 .gradio-container footer {
   display: none !important;
+}
+
+/* ── App shell and three-column workspace ── */
+.w3-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 2px 4px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--w3-border) 72%, transparent);
+  margin-bottom: 18px;
+}
+
+.w3-header-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: block;
+  box-shadow: 0 3px 10px rgba(9, 105, 218, 0.18);
+}
+
+.w3-header-copy { display: grid; gap: 1px; }
+.w3-header-name {
+  color: var(--w3-text);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+.w3-header-tagline { color: var(--w3-text-2); font-size: 12px; }
+
+.gradio-container .w3-workspace {
+  display: grid !important;
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(210px, 240px);
+  align-items: start;
+  gap: 18px !important;
+  width: 100%;
+}
+
+.gradio-container .w3-workspace > .w3-sidebar,
+.gradio-container .w3-workspace > .w3-chat-stage {
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+.gradio-container .w3-chat-stage {
+  position: relative;
+  z-index: 1;
+  gap: 12px !important;
+  padding: 10px !important;
+  background: var(--w3-panel);
+  border: 1px solid color-mix(in srgb, var(--w3-accent) 24%, var(--w3-border));
+  border-radius: 16px;
+  box-shadow: var(--w3-chat-shadow);
+}
+
+.gradio-container .w3-chat-stage::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -1px;
+  left: 10%;
+  width: 80%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--w3-accent), transparent);
+  opacity: 0.58;
+}
+
+.gradio-container .w3-chatbot {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--w3-panel-alt) !important;
+  overflow: hidden;
+}
+
+.gradio-container .w3-chat-input {
+  margin: 0 !important;
+  border-radius: 12px !important;
+  border-color: color-mix(in srgb, var(--w3-accent) 28%, var(--w3-border)) !important;
+  box-shadow: 0 0 0 3px var(--w3-accent-soft) !important;
+}
+
+.gradio-container .w3-sidebar {
+  gap: 10px !important;
+  padding: 4px 2px !important;
+}
+
+.gradio-container .w3-sidebar-right .bot_cover,
+.gradio-container .w3-sidebar-right > .block,
+.gradio-container .w3-sidebar-right > .form,
+.gradio-container .w3-sidebar-right > .wrap {
+  box-shadow: var(--w3-side-shadow);
 }
 
 /* ── Header theme toggle ── */
@@ -300,15 +396,16 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--w3-text-2);
-  margin: 4px 0 2px;
+  margin: 6px 4px 0;
 }
 
 .w3-status {
   background: var(--w3-panel);
   border: 1px solid var(--w3-border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 11px 12px;
   font-size: 13px;
+  box-shadow: var(--w3-side-shadow);
 }
 
 .w3-status-row {
@@ -475,9 +572,67 @@ body {
 
 .w3-empty { font-size: 13px; color: var(--w3-text-2); }
 
-.w3-new-conversation { width: 100%; margin-bottom: 8px; }
-.w3-conversation-selector { margin-bottom: 14px; }
+.w3-new-conversation {
+  width: 100%;
+  margin-bottom: 4px;
+  min-height: 38px;
+  border-radius: 10px !important;
+}
+.w3-conversation-selector { margin-bottom: 10px; }
 .w3-conversation-selector label span { font-size: 12px; }
+
+/* Sidebars stay visually quiet; the central conversation remains dominant. */
+.gradio-container .w3-sidebar .block,
+.gradio-container .w3-sidebar .form {
+  border-radius: 12px !important;
+}
+
+.gradio-container .w3-sidebar-right .bot_cover {
+  padding: 18px 14px !important;
+}
+
+.gradio-container .w3-sidebar-right .bot_avatar,
+.gradio-container .w3-sidebar-right .bot_avatar img {
+  width: 72px !important;
+  height: 72px !important;
+}
+
+@media (max-width: 1280px) {
+  /* Use component-local selectors in media rules. Gradio scopes custom CSS
+     beneath `.contain`; repeating `.gradio-container` here would produce an
+     impossible nested selector after that transformation. */
+  .w3-workspace {
+    grid-template-columns: 210px minmax(0, 1fr) 210px;
+    gap: 14px !important;
+  }
+}
+
+@media (max-width: 1020px) {
+  .w3-workspace {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .w3-sidebar-right {
+    grid-column: 1 / -1;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .w3-header { margin-bottom: 12px; }
+
+  .w3-workspace {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px !important;
+  }
+
+  .w3-chat-stage { order: -1; width: 100%; padding: 6px !important; }
+  .w3-sidebar { width: 100%; }
+  .w3-sidebar-right { display: flex !important; }
+}
 
 /* Rendered markdown inside result blocks */
 .w3-md { font-size: 13px; line-height: 1.65; color: var(--w3-text); overflow-wrap: break-word; }

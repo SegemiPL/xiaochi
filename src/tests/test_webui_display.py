@@ -77,6 +77,36 @@ def test_theme_overrides_vendor_details_nowrap_and_bounds_wide_content():
     assert 'overflow-x: auto;' in css
 
 
+def test_theme_prioritizes_chat_stage_and_keeps_sidebars_responsive():
+    css = Path(THEME_CSS_PATH).read_text(encoding='utf-8')
+
+    assert 'max-width: 1880px !important;' in css
+    assert 'grid-template-columns: minmax(210px, 240px) minmax(0, 1fr)' in css
+    assert '.gradio-container .w3-chat-stage' in css
+    assert 'box-shadow: var(--w3-chat-shadow);' in css
+    assert '@media (max-width: 1020px)' in css
+    assert '@media (max-width: 760px)' in css
+    assert '@media (max-width: 760px) {\n  .w3-header' in css
+    assert '.w3-workspace {\n    display: flex !important;' in css
+
+
+def test_webui_layout_exposes_stable_styling_hooks():
+    source = Path(__file__).parents[1].joinpath('agent', 'webui.py').read_text(encoding='utf-8')
+
+    for class_name in (
+        'w3-workspace',
+        'w3-sidebar-left',
+        'w3-chat-stage',
+        'w3-chatbot',
+        'w3-chat-input',
+        'w3-sidebar-right',
+    ):
+        assert class_name in source
+
+    assert 'audio_input = gr.State(None)' in source
+    assert 'audio_input = gr.Audio(' not in source
+
+
 def test_render_side_panels(tmp_path, monkeypatch):
     from src.config import runtime
 

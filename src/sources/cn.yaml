@@ -148,6 +148,8 @@ sources:
     title: Tax Policy Index
     authority: State Taxation Administration
     url: https://www.chinatax.gov.cn/chinatax/n810341/n810755/index.html
+    aliases: [国家税务总局税收政策法规库, 国家税务总局政策法规]
+    keywords: [税务总局, 税收政策, 个人所得税, 个税, 股息红利, 企业所得税]
     domains: [tax]
     reliability: A
     source_type: tax authority guidance

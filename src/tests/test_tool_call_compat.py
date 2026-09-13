@@ -3,6 +3,8 @@
 from qwen_agent.llm.schema import ASSISTANT, FunctionCall, Message
 from src.agent.tool_call_compat import (
     ToolCallCompatibilityMixin,
+    _has_runaway_repetition,
+    normalize_native_tool_calls,
     normalize_textual_tool_calls,
 )
 
@@ -94,7 +96,120 @@ def test_boundary_only_normalizes_when_tools_are_enabled():
 
     boundary = CompatibleBoundary()
     without_tools = next(boundary._call_llm(messages=[], functions=[]))
-    with_tools = next(boundary._call_llm(messages=[], functions=[{"name": "x"}]))
+    with_tools = next(
+        boundary._call_llm(
+            messages=[],
+            functions=[{"name": "YamlReadTool"}, {"name": "WebSearchTool"}],
+        )
+    )
 
     assert without_tools[0].content == DSML_RESPONSE
     assert with_tools[1].function_call.name == "YamlReadTool"
+
+
+def test_polluted_native_tool_name_is_repaired_when_arguments_are_valid():
+    malformed = Message(
+        ASSISTANT,
+        "",
+        function_call=FunctionCall(
+            name='WebSearchTool",\narguments": {"jurisdiction": "CN',
+            arguments='{"jurisdiction": "CN", "query": "税收公告"}',
+        ),
+    )
+
+    output, issue = normalize_native_tool_calls([malformed], {"WebSearchTool"})
+
+    assert issue is None
+    assert output[0].function_call.name == "WebSearchTool"
+    assert output[0].function_call.arguments == '{"jurisdiction": "CN", "query": "税收公告"}'
+
+
+def test_native_tool_call_with_lost_arguments_is_rejected():
+    malformed = Message(
+        ASSISTANT,
+        "",
+        function_call=FunctionCall(name="WebSearchTool", arguments=""),
+    )
+
+    output, issue = normalize_native_tool_calls([malformed], {"WebSearchTool"})
+
+    assert output == []
+    assert issue == "invalid_tool_arguments"
+
+
+def test_long_repeated_reasoning_is_detected_but_normal_answer_is_not():
+    repeated = ("I will now write the answer with the available evidence. " * 20).strip()
+    assert _has_runaway_repetition(
+        [Message(ASSISTANT, "", reasoning_content="\n\n".join([repeated] * 5))]
+    )
+    assert not _has_runaway_repetition([Message(ASSISTANT, "这是一个简洁且正常的回答。")])
+
+
+def test_multi_paragraph_planning_cycle_is_detected_independent_of_period():
+    cycle = [
+        "Actually, I should use a different search approach because the current engine returned no official result.",
+        "The question asks for the current policy and effective date, so I still need an authoritative document.",
+        "Let me search the official tax website again with shorter keywords and avoid guessing any page URL.",
+        "I should not rely on the secondary article until the official source has been located and fetched.",
+        "Now I will try another query using the issuing authorities and the affected dividend exemption.",
+    ]
+    reasoning = "\n\n".join(cycle * 5)
+
+    assert _has_runaway_repetition([Message(ASSISTANT, "", reasoning_content=reasoning)])
+
+
+def test_boundary_retries_instead_of_executing_malformed_native_call():
+    class FakeBoundary:
+        calls = 0
+
+        def _call_llm(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                yield [
+                    Message(
+                        ASSISTANT,
+                        "",
+                        function_call=FunctionCall(name="WebSearchTool", arguments="not-json"),
+                    )
+                ]
+            else:
+                yield [Message(ASSISTANT, "已改为正常回答。")]
+
+    class CompatibleBoundary(ToolCallCompatibilityMixin, FakeBoundary):
+        pass
+
+    boundary = CompatibleBoundary()
+    output = list(
+        boundary._call_llm(
+            messages=[Message(role="user", content="问题")],
+            functions=[{"name": "WebSearchTool"}],
+        )
+    )
+
+    assert boundary.calls == 2
+    assert output == [[Message(ASSISTANT, "已改为正常回答。")]]
+
+
+def test_second_malformed_attempt_ends_with_safe_visible_error():
+    class FakeBoundary:
+        def _call_llm(self, **kwargs):
+            yield [
+                Message(
+                    ASSISTANT,
+                    "",
+                    function_call=FunctionCall(name="WebSearchTool", arguments="not-json"),
+                )
+            ]
+
+    class CompatibleBoundary(ToolCallCompatibilityMixin, FakeBoundary):
+        pass
+
+    output = list(
+        CompatibleBoundary()._call_llm(
+            messages=[Message(role="user", content="问题")],
+            functions=[{"name": "WebSearchTool"}],
+        )
+    )
+
+    assert len(output) == 1
+    assert "没有被执行" in output[0][0].content

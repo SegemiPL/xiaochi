@@ -18,7 +18,12 @@ from src.websearch.client import OpenWebSearchClient, OpenWebSearchError
 from src.websearch.policy import is_official_url, load_jurisdiction_search_policy
 from src.websearch.provenance import register_discovered_urls
 from src.websearch.registry import infer_official_domains, load_registry_matches
-from src.websearch.relevance import relevance_score, strip_site_operators
+from src.websearch.relevance import (
+    exact_title_search_query,
+    near_duplicate_query,
+    relevance_score,
+    strip_site_operators,
+)
 from src.websearch.safe_site import SafeOfficialSiteClient, SafeSiteError, is_safe_search_query
 
 UNTRUSTED_CONTENT_NOTICE = (
@@ -47,12 +52,22 @@ class WebSearchTool(BaseTool):
         "select suitable engines and mark official domains. Returned results have passed an LLM "
         "relevance review against your current task; results discarded by the review are listed "
         "in discarded_by_judge with reasons. Search results are discovery leads; "
-        "call WebFetchTool on relevant official URLs before relying on them."
+        "call WebFetchTool on relevant official URLs before relying on them. Query rule: if the "
+        "user provides an exact document title in Chinese book-title marks or quotation marks, "
+        "the first query must use that exact title in double quotes, plus only its document number "
+        "or issuing authority when useful. Never copy the full natural-language question into the "
+        "query. For exploratory topics without a known title, use compact unquoted keywords."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
-            "query": {"description": "Focused search query", "type": "string"},
+            "query": {
+                "description": (
+                    "Compact discovery query. Exact known document titles must be double-quoted; "
+                    "do not pass the user's full natural-language question."
+                ),
+                "type": "string",
+            },
             "jurisdiction": {
                 "description": "Applicable jurisdiction, if known",
                 "type": "string",
@@ -79,6 +94,7 @@ class WebSearchTool(BaseTool):
         self._budget_run_id: str | None = None
         self._search_count = 0
         self._failed_engines: dict[str, str] = {}
+        self._query_history: list[str] = []
 
     def call(self, params: str | dict, **kwargs) -> str:
         try:
@@ -86,9 +102,10 @@ class WebSearchTool(BaseTool):
         except (TypeError, ValueError):
             return _error_json("invalid_arguments", "arguments must be a JSON object")
 
-        query = str(arguments.get("query") or "").strip()
-        if not query:
+        original_query = str(arguments.get("query") or "").strip()
+        if not original_query:
             return _error_json("invalid_arguments", 'missing required parameter "query"')
+        query, query_strategy = exact_title_search_query(original_query)
         jurisdiction = str(arguments.get("jurisdiction") or "").strip().upper() or None
         try:
             policy = load_jurisdiction_search_policy(jurisdiction)
@@ -107,6 +124,21 @@ class WebSearchTool(BaseTool):
             self._budget_run_id = run_id
             self._search_count = 0
             self._failed_engines = {}
+            self._query_history = []
+
+        duplicate_of = next(
+            (previous for previous in self._query_history if near_duplicate_query(query, previous)),
+            None,
+        )
+        if duplicate_of is not None:
+            return _error_json(
+                "redundant_search_query",
+                "This query repeats or closely paraphrases a search already attempted in this run. "
+                "STOP rephrasing the same query. Use an exact document title/document number or a "
+                "different authoritative source path; otherwise report the evidence gap.",
+                details={"query": query, "duplicate_of": duplicate_of},
+            )
+        self._query_history.append(query)
 
         try:
             limit = max(
@@ -137,6 +169,8 @@ class WebSearchTool(BaseTool):
                     "retrieved_at": datetime.now(UTC).isoformat(),
                     "untrusted_content_notice": UNTRUSTED_CONTENT_NOTICE,
                     "query": query,
+                    "original_query": original_query,
+                    "query_strategy": query_strategy,
                     "engines": ["source_registry"],
                     "total_results": len(selected),
                     "qualified_results": len(selected),
@@ -222,6 +256,8 @@ class WebSearchTool(BaseTool):
                             "retrieved_at": datetime.now(UTC).isoformat(),
                             "untrusted_content_notice": UNTRUSTED_CONTENT_NOTICE,
                             "query": query,
+                            "original_query": original_query,
+                            "query_strategy": query_strategy,
                             "engines": ["safe_site"],
                             "raw_total_results": len(official_results),
                             "total_results": len(ranked_official),
@@ -272,8 +308,8 @@ class WebSearchTool(BaseTool):
             if item["is_official"] and item["relevance_score"] >= MIN_RESULT_RELEVANCE
         ]
         if not qualified_official and "site:" not in query.lower():
-            candidate_domains = _official_result_domains(raw_results, official_domains)
-            for domain in infer_official_domains(query, jurisdiction):
+            candidate_domains = infer_official_domains(query, jurisdiction)
+            for domain in _official_result_domains(raw_results, official_domains, query=query):
                 if domain not in candidate_domains and is_official_url(
                     f"https://{domain}/", official_domains
                 ):
@@ -285,6 +321,7 @@ class WebSearchTool(BaseTool):
             ] or None
             if candidate_domains and healthy_engines and self._search_count < SEARCH_BUDGET_PER_AGENT:
                 constrained_query = f"site:{candidate_domains[0]} {strip_site_operators(query)}"
+                self._search_count += 1
                 try:
                     retry = self.client.search(
                         constrained_query,
@@ -330,7 +367,11 @@ class WebSearchTool(BaseTool):
             (item["url"] for item in ranked_results), source="web_search_result"
         )
         official_count = sum(bool(item["is_official"]) for item in ranked_results)
-        quality = "strong" if official_count else ("usable" if ranked_results else "insufficient")
+        quality = (
+            "strong"
+            if official_count
+            else ("leads_only" if ranked_results else "insufficient")
+        )
         if not ranked_results and judged_out:
             guidance = (
                 "All search results were reviewed and discarded as irrelevant to the current "
@@ -342,7 +383,11 @@ class WebSearchTool(BaseTool):
             guidance = (
                 "Relevant official discovery results are available; fetch them before relying on them."
                 if official_count
-                else "No relevant official result was found. Do not treat discarded or generic pages as evidence."
+                else (
+                    "Only non-official discovery leads were found. They may help identify an exact "
+                    "document title or number, but are not usable evidence; locate and fetch the "
+                    "official source before answering the material claim."
+                )
             )
         return json.dumps(
             {
@@ -352,6 +397,8 @@ class WebSearchTool(BaseTool):
                 "retrieved_at": datetime.now(UTC).isoformat(),
                 "untrusted_content_notice": UNTRUSTED_CONTENT_NOTICE,
                 "query": query,
+                "original_query": original_query,
+                "query_strategy": query_strategy,
                 "engines": response.engines,
                 "search_attempts": search_attempts,
                 "raw_total_results": len(raw_results),
@@ -500,10 +547,17 @@ def _rank_results(results, query: str, official_domains: list[str]) -> tuple[lis
     return ranked, len(prepared) - len(ranked)
 
 
-def _official_result_domains(results, official_domains: list[str]) -> list[str]:
+def _official_result_domains(
+    results,
+    official_domains: list[str],
+    *,
+    query: str,
+) -> list[str]:
     domains: list[str] = []
     for item in results:
         if not is_official_url(item.url, official_domains):
+            continue
+        if relevance_score(query, item.title, item.snippet) < MIN_RESULT_RELEVANCE:
             continue
         hostname = (urlparse(item.url).hostname or "").lower().removeprefix("www.")
         if hostname and hostname not in domains:

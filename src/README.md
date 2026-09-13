@@ -150,10 +150,19 @@ Web Search 使用独立的本地 `open-websearch` daemon。安装与启动方法
 | `OPEN_WEBSEARCH_ALLOW_REMOTE` | `false` | 显式允许远程 daemon，不建议日常开启 |
 | `OPEN_WEBSEARCH_AUTOSTART` | `true` | 随 `python -m src.main` 自动启动本地 daemon |
 | `OPEN_WEBSEARCH_STARTUP_TIMEOUT_SECONDS` | `15` | daemon 就绪等待时间，范围 1–120 秒 |
+| `OPEN_WEBSEARCH_PROXY_URL` | 空 | daemon 专用 HTTP(S) 代理；未设置 `USE_PROXY` 时优先使用 |
+| `USE_PROXY` / `PROXY_URL` | 自动推断 | open-webSearch 原生代理开关；显式设置时优先级最高 |
 | `WEBSEARCH_TIMEOUT_SECONDS` | `30` | 单次 HTTP 调用超时，范围 1–120 秒 |
 | `WEBSEARCH_MAX_RESULTS` | `10` | 搜索结果硬上限，范围 1–50 |
 | `WEBFETCH_MAX_CHARS` | `8000` | 单页正文字符硬上限，范围 1000–8000 |
 | `WEBSEARCH_FALLBACK_TO_SEARXNG` | `false` | open-websearch 失败或无结果时回退旧 SearXNG |
+
+若没有显式配置 `USE_PROXY`，启动器会把现有的 `HTTPS_PROXY`/`https_proxy` 或
+`HTTP_PROXY`/`http_proxy` 转换为 open-webSearch 要求的 `USE_PROXY=true` 与
+`PROXY_URL`。显式设置 `USE_PROXY=false` 可关闭自动继承。代理设置只在 daemon
+启动时读取；修改环境变量后需要重启 3wagent 和仍在后台运行的旧 daemon。
+若端口上已有 daemon，但其代理开关与当前进程要求不一致，3wagent 会拒绝静默
+复用并给出重启提示，避免继续把不可用的海外引擎包装成正常搜索。
 
 检索遵循：本地 `sources/` registry 优先，开放网络仅作补充；搜索摘要只能用于发现候选 URL，必须通过 `WebFetchTool` 获取官方页面正文后才能作为证据。法域对应的引擎与官方域名配置位于 `config/jurisdictions.yaml`。
 

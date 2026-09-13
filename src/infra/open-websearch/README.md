@@ -33,6 +33,11 @@ The daemon is expected at `http://127.0.0.1:3210`. It is a local dependency;
 do not expose it publicly. If outbound traffic needs a proxy, configure the
 daemon explicitly with `USE_PROXY=true` and `PROXY_URL=...`.
 
+When the daemon is started by `python -m src.main`, 3wagent also translates an
+existing `HTTPS_PROXY`/`HTTP_PROXY` into that explicit pair. Set
+`USE_PROXY=false` to opt out, or `OPEN_WEBSEARCH_PROXY_URL` to select a proxy
+without changing the rest of the process environment.
+
 Playwright/browser mode is intentionally not installed by default. Add it only
 when official sites cannot be retrieved in request mode, and use a dedicated
 anonymous browser profile rather than a personal logged-in browser.

@@ -55,6 +55,8 @@ def load_registry_matches(
             for value in (
                 entry.get("authority") or "",
                 entry.get("notes") or "",
+                " ".join(str(item) for item in entry.get("aliases") or []),
+                " ".join(str(item) for item in entry.get("keywords") or []),
                 " ".join(str(item) for item in entry.get("domains") or []),
                 " ".join(str(item) for item in entry.get("subdomains") or []),
             )
@@ -86,7 +88,14 @@ def infer_official_domains(query: str, jurisdiction: str | None, *, limit: int =
         if not hostname:
             continue
         title = str(entry.get("title") or "")
-        context = f"{entry.get('authority') or ''} {entry.get('notes') or ''}"
+        context = " ".join(
+            (
+                str(entry.get('authority') or ''),
+                str(entry.get('notes') or ''),
+                " ".join(str(item) for item in entry.get("aliases") or []),
+                " ".join(str(item) for item in entry.get("keywords") or []),
+            )
+        )
         score = relevance_score(query, title, context)
         if score >= 0.2:
             ranked.append((score, hostname.removeprefix("www.")))

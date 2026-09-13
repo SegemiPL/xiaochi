@@ -7,13 +7,15 @@ jurisdictions:
     label_en: Mainland China
     label_zh: 中国内地
     web_search:
-      # bing is the most reliable under agent traffic; baidu/sogou often fail
-      # (302 / anti-bot) but stay as backups — the runtime skips engines that
-      # already failed during the run.
-      engines: [bing, baidu, sogou]
+      # DuckDuckGo returns substantially better Chinese policy results when
+      # the local daemon inherits the host HTTP proxy. Bing remains a broad
+      # backup; baidu/sogou are omitted because agent traffic consistently
+      # receives redirects, anti-bot pages or lexical garbage.
+      engines: [duckduckgo, bing]
       official_domains:
         - npc.gov.cn
         - gov.cn
+        - mof.gov.cn
         - safe.gov.cn
         - pbc.gov.cn
         - chinatax.gov.cn
