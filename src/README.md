@@ -1,31 +1,33 @@
-# 3wagent Refactor（基于 qwen-agent 的新运行时）
+# 3wagent 运行与配置
 
-`src/` 是 3wagent 的第二次架构转向：重新自建 runtime，但基于 [qwen-agent](https://github.com/QwenLM/qwen-agent) 而非 LangChain。`src/` 同时也是新框架的运行时根目录；运行所需的配置、来源注册表、模板与 Web Search 服务均位于其中，不依赖仓库根目录的旧架构。
+`src/` 是当前运行时根目录，使用 [qwen-agent](https://github.com/QwenLM/qwen-agent) 管理对话与工具调用。运行所需的配置、来源注册表、模板与 Web Search 服务均位于其中。
 
-> 原架构说明见仓库根目录的 `docs/architecture.md`；本文档只描述 `src/` 重构。
+> 当前组件和数据流见 [`docs/architecture.md`](docs/architecture.md)。
 > 面向 42 道测试题的能力路线图及实时实现状态见
 > [`docs/agent-capability-roadmap.md`](docs/agent-capability-roadmap.md)。
 
 ## 当前状态
 
-骨架已搭好并可在本地 llama-server 上跑通对话；多子代理路由、检索、校验、领域分析、引用核验和报告写作流水线已经接入，仍处于持续验证阶段。
+主 Agent 已可在 WebUI 与 CLI 中运行，并可选择 DeepSeek、Kimi 或本地兼容 OpenAI API 的模型。附件摄取、来源搜索、正文抓取与按需专家委派已经接入；能力覆盖和端到端可靠性仍按路线图持续验证。不存在所有问题必须经过的固定子代理流水线。
 
 ## 目录结构
 
 ```
 src/
-├── main.py                 # CLI 入口（argparse + 启动 agent + Gradio WebUI）
+├── main.py                 # WebUI / CLI 入口与搜索服务管理
 ├── pyproject.toml          # 独立包 3wagent-refactor，依赖 qwen-agent[gui,python-executor]
 ├── environment.yml         # 等价的 conda 环境定义（python 3.12）
 ├── agent/
 │   ├── attachments.py      # 将上传的文本附件安全地内联到模型上下文
-│   ├── main_agent.py       # MainAgent(FnCallAgent) 与子 agent 流水线编排
-│   └── subagent.py         # Routing/RAG/Validate/Analyst/Citation/Writer 子 agent
+│   ├── main_agent.py       # 自适应 MainAgent(FnCallAgent)
+│   ├── cli.py              # 终端交互界面
+│   ├── webui.py            # Gradio 界面与历史对话
+│   └── subagent.py         # 按需调用的专项 Agent
 ├── config/
 │   ├── llm.py              # LLM provider 配置加载器
 │   ├── llm.yaml            # DeepSeek / Kimi / local provider 配置
 │   ├── webui.py            # Gradio WebUI 的 chatbot 配置（prompt 建议）
-│   ├── logger.py           # DEBUG 模式文件日志，写 src/workspace/logs/<model><ts>.log
+│   ├── logger.py           # 单轮日志写入 src/workspace/<run-id>/logs/<model>.log
 │   └── *.yaml              # 路由、法域、来源等级与输出契约
 ├── sources/                # 各法域官方来源注册表
 ├── templates/              # 报告与检索任务模板
@@ -41,24 +43,26 @@ src/
 │   └── protocol.py             # 稳定的内部返回结构
 ├── prompts/
 │   └── prompts.py          # MAIN_AGENT_SYS_PROMPT 系统提示词
-├── reports/                # 生成的正式报告（运行时创建，Git 忽略）
-├── workspace/              # 子代理中间产物与日志（运行时创建，Git 忽略）
-└── llm/                    # 空占位目录，LLM 逻辑目前在 config/llm.py
+├── reports/                # 按请求生成的正式报告（Git 忽略）
+└── workspace/              # 对话、单轮运行产物与日志（Git 忽略）
 ```
 
 ## 运行方式
 
 ```bash
-# 在项目根目录（src/ 的上一级）执行；默认使用 src/config/llm.yaml 的 local
-python -m src.main
-python -m src.main --provider deepseek
-python -m src.main --provider kimi
-python -m src.main --provider local --model <model-name>
-python -m src.main -d              # DEBUG 模式，日志写入 src/workspace/logs/
+# 在项目根目录（src/ 的上一级）执行
+uv sync --project src
+npm ci --prefix src/infra/open-websearch
+src/.venv/bin/python -m src.main                         # 默认 local 模型、WebUI
+src/.venv/bin/python -m src.main --provider deepseek
+src/.venv/bin/python -m src.main --provider kimi
+src/.venv/bin/python -m src.main --cli --provider deepseek  # 终端交互
+src/.venv/bin/python -m src.main --provider local --model <model-name>
+src/.venv/bin/python -m src.main -d                       # DEBUG 模式
 ```
 
 启动时会自动探测并启动本地 open-websearch daemon，随后打开 qwen-agent
-内置的 Gradio WebUI。程序退出时会关闭本次启动的 daemon；如果 daemon
+内置的 Gradio WebUI（加上 `--cli` 时进入终端交互）。程序退出时会关闭本次启动的 daemon；如果 daemon
 原本已经运行，则只复用、不关闭。
 
 ### 外部模型 API + 本地 Agent
@@ -125,7 +129,7 @@ WebUI 地址。浏览器中的 Agent 会自动获得 `WebSearchTool` 和
 Agent 会按需调用这些工具，简单对话通常不会触发搜索。
 
 WebUI 会把每个对话的完整上下文自动保存到
-`workspace/conversations/<conversation-id>.json`。左侧“历史对话”可以恢复此前
+`src/workspace/conversations/<conversation-id>.json`。左侧“历史对话”可以恢复此前
 对话并继续追问；点击“新对话”会清空当前页面上下文，但不会删除已保存记录。
 
 LLM 请求通过 SSH 隧道发送到远程服务器；搜索引擎访问和官方网页抓取则
@@ -231,14 +235,6 @@ LLM 配置位于 `src/config/llm.yaml`，由 `src/config/llm.py` 加载。provid
 - **WebSearchTool** — 调用 open-websearch 搜索候选来源并标记官方域名
 - **WebFetchTool** — 抓取候选页面正文和来源元数据；网页内容始终视为不可信证据
 - **DelegatePolicyTask** — 仅在复杂问题确有必要时运行一个有界专家任务；不会启动固定流水线
-
-## 与原架构的关键差异
-
-原项目的核心决策是 "agent-native，不自建 runtime"：分析逻辑由 Claude Code 承载，规则沉淀在 `.claude/CLAUDE.md`、`.claude/agents/` 和 `config/*.yaml` 中。本次重构：
-
-**被 qwen-agent 替代的**：对话循环、工具调用协议、Web 交互界面、消息 schema。
-
-**保留为自定义的**：领域提示词、`src/config/*.yaml` 策略文件、`src/sources/` 来源注册表、`src/templates/` 和文件读取工具。仓库根目录的旧目录可以在迁移完成后删除，不影响新运行时。
 
 ## 当前自适应执行方式
 

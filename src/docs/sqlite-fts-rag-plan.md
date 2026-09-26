@@ -12,23 +12,13 @@
 - 支持中文、英文、法规名称、文号和条款检索；
 - 支持法规快照、历史版本、有效期和更新审计；
 - 能够向 Validate、领域分析和 Citation Verifier 提供可定位的证据；
-- 后续可以平滑增加 Elasticsearch、Chroma 或其他 Dense Retriever，而无需改造上层 pipeline。
+- 后续可以平滑增加 Elasticsearch、Chroma 或其他 Dense Retriever，而无需改造主 Agent 的按需检索接口。
 
 本文档只规划 SQLite FTS 方案，不包含具体业务法规的采集清单，也不在第一阶段引入向量数据库。
 
 ## 2. 背景与现状
 
-当前专业问题处理流程已经包含：
-
-1. Attachment Parsing
-2. Routing
-3. RAG
-4. Validate
-5. Domain Analysis
-6. Citation Verification
-7. Report Writing
-
-RAG 已位于 Routing 与 Validate 之间，但目前主要依靠：
+当前主 Agent 按问题范围自适应选择工具和专项 Agent；来源检索、有效性核验、领域分析、引用复核和报告写作不是固定流水线。本方案只扩展来源检索能力，供主 Agent 或来源检索专家按需调用。目前检索主要依靠：
 
 - `sources/*.yaml` 来源注册表；
 - `WebSearchTool` 搜索候选页面；
@@ -106,8 +96,10 @@ Citation   核对结论与具体 chunk 的支撑关系
 
 ## 4. 目标架构
 
+以下是需要检索和后续核验时的一种数据流示例，并非所有请求都要执行这些步骤。主 Agent 可以直接使用检索结果，也可以按证据缺口选择有效性、领域或引用复核能力。
+
 ```text
-Routing
+MainAgent / optional source-research specialist
   │
   │ RetrievalRequest
   ▼
@@ -121,16 +113,11 @@ RAG Retriever
   │
   │ EvidencePack
   ▼
-Validate
-  │ ValidatedEvidencePack
-  ▼
-Domain Analysts
-  │ Claim and citation mapping
-  ▼
-Citation Verifier
-  │ Verification findings
-  ▼
-Report Writer
+MainAgent
+  ├─ optional validity review
+  ├─ optional domain analysis
+  ├─ optional citation review
+  └─ scoped answer / requested formal report
 ```
 
 ## 5. 建议目录结构
@@ -1204,5 +1191,4 @@ Dense results ──────┘
 - 项目来源元数据约定：`src/sources/README.md`
 - 项目检索任务模板：`src/templates/retrieval-task.md`
 - 项目当前 RAG prompt：`src/prompts/prompts.py`
-- 项目当前 pipeline：`src/agent/main_agent.py`
-
+- 项目当前自适应编排：`src/agent/main_agent.py`、`src/tools/delegate_policy_task.py`

@@ -1,7 +1,7 @@
 [project]
 name = "3wagent"
 version = "0.1.0"
-description = "Claude Code/Codex skills for cross-border policy research."
+description = "Cross-border policy research agent powered by the qwen-agent runtime in src/."
 requires-python = ">=3.11"
 dependencies = []
 
