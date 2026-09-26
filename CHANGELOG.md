@@ -258,3 +258,13 @@ All checks passed!
 - 正式报告按用户请求生成；结构化证据账本、远程文档缓存及 SQLite FTS 正文索引仍属于后续能力建设。
 
 当前组件与数据流见 [`src/docs/architecture.md`](src/docs/architecture.md)，启动方式见 [`src/README.md`](src/README.md)。
+
+---
+
+## 阶段十一：清理旧架构占位文件
+
+**时间**：2026-09-26
+
+- 删除仓库根目录 `reports/.gitkeep` 和 `runs/.gitkeep`；当前运行时的报告与运行记录分别位于 `src/reports/` 和 `src/workspace/`。
+- 删除不再被当前运行时引用的 `skills-lock.json`。
+- 这次清理不改变 `src/` 中的 Agent、WebUI、CLI 或数据存储逻辑。
