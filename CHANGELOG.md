@@ -1,6 +1,6 @@
 # 3wagent 演进历程
 
-> 从 Python 应用原型到 Claude Code subagent-native 的跨境政策研究工作区
+> 从早期应用与 Agent 工作区方案演进到当前基于 qwen-agent 的运行时。下文阶段一至九是历史记录，不能作为当前部署说明；请以 [README](README.zh-CN.md) 和 [当前架构](src/docs/architecture.md) 为准。
 
 ---
 
@@ -135,7 +135,7 @@
 
 ---
 
-当前系统的核心形态：
+阶段六时系统的核心形态：
 
 - **运行方式**：Claude Code 主会话作为 Lead Policy Agent
 - **协作方式**：项目级 subagents 负责文档解析、检索、专项分析和引用校验
@@ -244,3 +244,17 @@ All checks passed!
 - dashboard 是本地观察层，不改变 agent / subagent / skill 的分析编排
 - FastAPI 只做静态文件服务和本地文件读取，不引入 LangChain / LangGraph runtime
 - 删除接口是硬删除，仅面向本地开发使用
+
+---
+
+## 阶段十：qwen-agent 运行时与自适应编排
+
+**状态**：当前架构；具体能力验收状态见 [`src/docs/agent-capability-roadmap.md`](src/docs/agent-capability-roadmap.md)。
+
+- 运行入口迁至 `src/main.py`，使用 qwen-agent `FnCallAgent`，提供 Gradio WebUI 和交互式 CLI；模型可选 DeepSeek、Kimi 或兼容 OpenAI API 的本地服务。
+- 配置、提示词、来源注册表、模板、Web Search 服务和工作目录集中在 `src/`；旧的项目级 Agent 规则、MCP bridge、FastAPI dashboard 和 SQLite FTS 索引不再是当前运行时组件。
+- `MainAgent` 统一使用 normal 模式，按证据缺口直接调用工具或通过 `DelegatePolicyTask` 委派有边界的专家任务，不再强制执行固定研究流水线。
+- 附件摄取、来源发现与网页/PDF 抓取已接入；WebUI 保存多轮对话，单轮运行保存日志、专家结果与能力选择轨迹。
+- 正式报告按用户请求生成；结构化证据账本、远程文档缓存及 SQLite FTS 正文索引仍属于后续能力建设。
+
+当前组件与数据流见 [`src/docs/architecture.md`](src/docs/architecture.md)，启动方式见 [`src/README.md`](src/README.md)。

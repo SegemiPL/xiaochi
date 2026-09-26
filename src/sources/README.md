@@ -1,6 +1,6 @@
 # Source Registries
 
-This folder contains curated starting points for 3wagent retrieval. The registry is not a complete legal database. It gives the lead agent and `rag-retriever` a trusted first pass before using open web search.
+This folder contains curated starting points for 3wagent retrieval. The registry is not a complete legal database. It gives the main agent and the optional source-research specialist a trusted first pass before using open web search.
 
 ## Entry Schema
 
