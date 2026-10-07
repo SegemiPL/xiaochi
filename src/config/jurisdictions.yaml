@@ -7,11 +7,7 @@ jurisdictions:
     label_en: Mainland China
     label_zh: 中国内地
     web_search:
-      # DuckDuckGo returns substantially better Chinese policy results when
-      # the local daemon inherits the host HTTP proxy. Bing remains a broad
-      # backup; baidu/sogou are omitted because agent traffic consistently
-      # receives redirects, anti-bot pages or lexical garbage.
-      engines: [duckduckgo, bing]
+      engines: [deepseek-official]
       official_domains:
         - npc.gov.cn
         - gov.cn
@@ -32,7 +28,7 @@ jurisdictions:
     label_en: United States
     label_zh: 美国
     web_search:
-      engines: [bing, duckduckgo, startpage]
+      engines: [deepseek-official]
       official_domains:
         - house.gov
         - irs.gov
@@ -51,7 +47,7 @@ jurisdictions:
     label_en: Hong Kong
     label_zh: 香港
     web_search:
-      engines: [bing, duckduckgo, startpage]
+      engines: [deepseek-official]
       official_domains:
         - gov.hk
         - hklii.hk
@@ -66,7 +62,7 @@ jurisdictions:
     label_en: Singapore
     label_zh: 新加坡
     web_search:
-      engines: [bing, duckduckgo, startpage]
+      engines: [deepseek-official]
       official_domains:
         - agc.gov.sg
         - mas.gov.sg

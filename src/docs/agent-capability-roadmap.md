@@ -46,12 +46,12 @@
 
 | 编号 | 能力 | 状态 | 最后更新 | 实现证据与缺口 |
 |---|---|---|---|---|
-| BASE-01 | 来源注册表优先、搜索相关性过滤、官方域自适应重试、失败引擎降级 | 🟡 部分实现 | 2026-09-13 | `src/websearch/relevance.py`、`src/websearch/registry.py`、`src/websearch/supervisor.py`、`src/tools/web_search.py`、`src/agent/judge.py`（LLM 二审）、`src/tests/test_search_strategy.py`、`src/tests/test_search_judge.py`、`src/tests/test_open_websearch.py`；已增加法规标题精确查询、近义重试熔断、主管机关域相关性约束、中英文来源别名、标准 HTTP 代理兼容及孤儿 daemon 安全接管；真实复测中 DuckDuckGo 对精确政策标题返回 3 条税务局官方页面，Bing 301 被隔离为部分失败；尚未纳入完整 eval 数据集和商业 API 兜底 |
-| BASE-02 | 官方 URL 来源追踪与抓取限制 | 🟡 部分实现 | 2026-09-11 | `src/websearch/provenance.py`、`src/tools/web_fetch.py`；可阻止猜测 URL，但长文档无法分段回读 |
+| BASE-01 | 来源注册表辅助、DeepSeek 原生搜索、相关性过滤与官方域有界重试 | 🟡 部分实现 | 2026-10-07 | `src/websearch/deepseek.py`、`src/config/websearch.py`、`src/tools/web_search.py`、`src/tests/test_deepseek_search.py`、`src/tests/test_search_strategy.py`；联网搜索替换为 DeepSeek Harness 的 Messages + `web_search_20250305`，复用 `DEEPSEEK_API_KEY`，仅解析结构化来源与引用摘录，移除模型选引擎和 SearXNG 自动回退；保留注册表权威域推断、LLM judge、官方域重试与预算，提供方失败在本轮熔断；当前环境无 API key，尚未完成真实联网及 42 题 eval 验收，状态保持部分实现 |
+| BASE-02 | 官方 URL 来源追踪（全文抓取已移除） | 🟡 部分实现 | 2026-10-07 | `src/websearch/provenance.py`、`src/websearch/deepseek.py`、`src/tests/test_deepseek_search.py`、`src/tests/test_web_search_integration.py`；仅结构化搜索 URL 进入来源追踪，忽略答复正文 URL、拒绝 API 重定向；按当前范围删除 WebFetchTool、daemon、远程 PDF 与 SAFE 链路，已无全文抓取／回读，提示词要求摘录不足时报告证据缺口 |
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
 | BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-09-11 | `src/agent/conversations.py` 保存消息；尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-09-13 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；WebUI 使用宽幅响应式三栏布局，以弹性主对话区和降噪侧栏突出对话；`src/tests/test_webui_display.py` 覆盖布局样式钩子与断点 |
+| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-10-07 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；WebUI 使用宽幅响应式三栏布局，以弹性主对话区和降噪侧栏突出对话；`src/tests/test_webui_display.py` 覆盖布局样式钩子与断点；`src/main.py` 移除 daemon 启动，`src/tests/test_web_search_integration.py` 验证 CLI/WebUI 直接启动；`src/pyproject.toml`、`src/environment.yml` 补齐侧栏 Markdown 渲染的 linkify 依赖 |
 
 ## 5. 待实现能力
 
@@ -80,7 +80,7 @@
 - E05 复用上轮研究，仅改变表达方式；
 - 复杂问题仍能主动使用检索、有效性核验和专业分析。
 
-实现证据：`src/agent/main_agent.py` 删除政策问题模式检测和固定流水线，所有输入统一进入 normal 模式主 agent；`src/tools/delegate_policy_task.py` 提供无前置顺序、单任务边界的可选专家委派（工具描述直接列出合法 capability 名，避免模型猜测浪费轮次）；`src/prompts/prompts.py` 定义最小能力集合、停止条件、短问/计算/改写直答和复杂问题分解原则；`workspace/<run-id>/capability_trace.jsonl` 记录工具、专家能力和选择原因；`src/tests/test_adaptive_orchestration.py` 覆盖 normal 模式、单专家隔离、错误能力拒绝和调试轨迹，`src/tests/test_open_websearch.py` 覆盖主 agent 工具能力与自适应提示契约。2026-09-12 两轮 22 个真实模型 CLI 用例（覆盖 A–E 五类）显示委派决策方向全部正确，但尚未形成结构化 smoke eval；完成 CAP-01 smoke eval 前维持"部分实现"。
+实现证据：`src/agent/main_agent.py` 删除政策问题模式检测和固定流水线，所有输入统一进入 normal 模式主 agent；`src/tools/delegate_policy_task.py` 提供无前置顺序、单任务边界的可选专家委派（工具描述直接列出合法 capability 名，避免模型猜测浪费轮次）；`src/prompts/prompts.py` 定义最小能力集合、停止条件、短问/计算/改写直答和复杂问题分解原则；`workspace/<run-id>/capability_trace.jsonl` 记录工具、专家能力和选择原因；`src/tests/test_adaptive_orchestration.py` 覆盖 normal 模式、单专家隔离、错误能力拒绝和调试轨迹，`src/tests/test_web_search_integration.py` 覆盖主 agent 工具能力与自适应提示契约。2026-09-12 两轮 22 个真实模型 CLI 用例（覆盖 A–E 五类）显示委派决策方向全部正确，但尚未形成结构化 smoke eval；完成 CAP-01 smoke eval 前维持"部分实现"。
 
 ### CAP-02：回答约束、错误前提与最小澄清
 
@@ -136,8 +136,10 @@
 
 - **优先级：P0**
 - **状态：⬜ 未开始**
-- **最后更新：2026-09-12**
+- **最后更新：2026-10-07**
 - **覆盖题目：A03–A06、A09、A10、A12、B01、C06、R09、R16、R18、R28、R30**
+
+当前范围说明：2026-10-07 已移除远程抓取工具与旧 daemon。此项仍未开始，后续实现需先明确全文来源与读取接口；当前 DeepSeek 搜索摘录不等价于全文快照。
 
 目标：远程 HTML/PDF 第一次抓取后保存不可变快照并分块，后续按页码、条款、标题、关键词或相邻段落读取本地缓存。
 
@@ -318,7 +320,7 @@
 
 | 阶段 | 内容 | 退出条件 |
 |---|---|---|
-| 0 | 搜索质量基线 | 注册表命中、相关性过滤、官方域重试和引擎降级进入稳定分支并完成实测 |
+| 0 | 搜索质量基线 | DeepSeek 原生搜索、注册表权威域推断、相关性过滤、官方域重试和提供方错误处理进入稳定分支并完成实测 |
 | 1 | CAP-01、CAP-02、CAP-11 smoke 集 | 短问、纯计算、错误前提和限字任务不再进入固定长流程 |
 | 2 | CAP-03、CAP-04 | 结论可回查到缓存文档的具体页码/条款，长文档可定向回读 |
 | 3 | CAP-05、CAP-06、CAP-10 | UK/AU/EU 可检索；多语言和历史版本可选择、可核验 |
@@ -328,6 +330,12 @@
 ## 7. 实现记录
 
 按时间倒序追加。每条记录应关联能力编号、代码或测试证据，并说明状态变化。
+
+### 2026-10-07
+
+- `BASE-06`：启动入口不再依赖本地搜索后台服务；完整回归发现原有侧栏 `gfm-like` Markdown 渲染缺少链接识别组件，在 Python 与 conda 依赖清单补充 `markdown-it-py[linkify]`，保持现有展示行为。验证由 `src/tests/test_webui_display.py` 和入口集成用例覆盖，完整回归 148 项通过。
+
+- `BASE-01`、`BASE-02`：联网搜索切换到 DeepSeek Harness `web-search-deepseek` 使用的 Anthropic 兼容 Messages 协议，复用 `DEEPSEEK_API_KEY`。新增原生结构化结果、引用摘录、来源日期、去重与截断、无搜索块拒绝、HTTP/工具错误、凭据轮换及重定向保护的离线回归；请求轨迹不含密钥，故障后本轮不再重复请求，取消海外引擎选择和 SearXNG 自动回退。按用户要求删除 OpenWebSearch daemon、客户端、SearXNG、WebFetchTool、远程 PDF 和 SAFE 专用链路及对应测试；入口不再管理后台服务，保留注册表、相关性审查与 DeepSeek 官方域重试。注册表元数据不再直接短路搜索，已知标题仍检索引用摘录；同步修改主／专家工具注册、附件 URL 提示及证据边界，运行时无需 Node.js。验证：`src/.venv/bin/python -B -m pytest -q src/tests` 完整回归 148 项通过；相关 Ruff 检查、`git diff --check` 和 `python -m src.main --help` 均通过。真实 API 验证因当前环境未设置密钥而未执行；两项状态均维持“部分实现”。
 
 ### 2026-09-13
 

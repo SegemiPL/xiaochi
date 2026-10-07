@@ -9,7 +9,6 @@ import argparse
 from qwen_agent.log import logger
 
 from src.agent.main_agent import run_3wagent
-from src.websearch.supervisor import OpenWebSearchSupervisor
 
 
 def parse_args():
@@ -39,18 +38,18 @@ def main():
     if args.DEBUG :
         logger.setLevel('DEBUG')
 
-    with OpenWebSearchSupervisor():
-        runner = run_3wagent
-        if args.cli:
-            # Keep terminal-only use independent of Gradio imports.
-            from src.agent.cli import run_cli_3wagent
+    runner = run_3wagent
+    if args.cli:
+        # Keep terminal-only use independent of Gradio imports.
+        from src.agent.cli import run_cli_3wagent
 
-            runner = run_cli_3wagent
-        runner(
-            model_name=args.model,
-            provider=args.provider,
-            config_path=args.llm_config,
-        )
+        runner = run_cli_3wagent
+    runner(
+        model_name=args.model,
+        provider=args.provider,
+        config_path=args.llm_config,
+    )
+
 
 if __name__ == "__main__":
     main()

@@ -3,9 +3,8 @@
 import json
 
 import pytest
-from qwen_agent.llm.schema import USER, Message
-
 import src.agent.judge as judge_module
+from qwen_agent.llm.schema import USER, Message
 from src.agent.judge import _validate_verdicts
 from src.tools.web_search import WebSearchTool
 from src.websearch.protocol import SearchResponse, SearchResult
@@ -13,14 +12,13 @@ from src.websearch.provenance import get_url_provenance
 
 
 def _make_tool(monkeypatch, results):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
     tool = WebSearchTool()
 
     class FakeClient:
         def search(self, query, **kwargs):
             return SearchResponse(
                 query=query,
-                engines=kwargs.get("engines") or ["bing"],
+                engines=["deepseek-official"],
                 results=results,
                 partial_failures=[],
             )
@@ -35,14 +33,14 @@ def _two_results():
             "测试规则甲 官方正文",
             "https://www.csrc.gov.cn/rule-a",
             "测试规则甲 全文 条款",
-            "bing",
+            "deepseek-official",
             "web",
         ),
         SearchResult(
             "测试规则乙 无关页面",
             "https://example.com/unrelated",
             "与测试规则甲无关的内容",
-            "bing",
+            "deepseek-official",
             "web",
         ),
     ]
@@ -72,7 +70,7 @@ def test_judge_filters_results_and_limits_provenance(monkeypatch):
     assert payload["discarded_by_judge"] == [
         {"title": "测试规则乙 无关页面", "url": "https://example.com/unrelated", "reason": "无关"}
     ]
-    # Only judged-in results are fetchable.
+    # Only accepted results enter source provenance.
     assert get_url_provenance("https://www.csrc.gov.cn/rule-a") is not None
     assert get_url_provenance("https://example.com/unrelated") is None
 

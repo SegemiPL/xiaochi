@@ -37,7 +37,6 @@ from src.tools.delegate_policy_task import DelegatePolicyTask
 from src.tools.read_attachment import AttachmentReadTool  # noqa: F401
 from src.tools.read_markdown_files import MarkDownReadTool  # noqa: F401
 from src.tools.read_yaml_files import YamlReadTool  # noqa: F401
-from src.tools.web_fetch import WebFetchTool  # noqa: F401
 from src.tools.web_search import WebSearchTool  # noqa: F401
 from src.tools.write_result import WriteResult  # noqa: F401
 from src.websearch.provenance import register_user_provided_urls
@@ -57,8 +56,8 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
         llm: dict | BaseChatModel | None = None,
     ):
         subagent_tools = ['MarkDownReadTool', 'YamlReadTool', 'AttachmentReadTool']
-        retrieval_tools = subagent_tools + ['WebSearchTool', 'WebFetchTool']
-        verification_tools = subagent_tools + ['WebSearchTool', 'WebFetchTool']
+        retrieval_tools = subagent_tools + ['WebSearchTool']
+        verification_tools = subagent_tools + ['WebSearchTool']
         self.specialists = {
             'source_research': RagSubAgent(function_list=retrieval_tools, llm=llm),
             'validity_review': ValidateSubAgent(function_list=verification_tools, llm=llm),
@@ -79,7 +78,6 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
             'YamlReadTool',
             'AttachmentReadTool',
             'WebSearchTool',
-            'WebFetchTool',
             'WriteResult',
             self.delegate_tool,
         ]

@@ -9,13 +9,12 @@
                                 │
                                 ├─ 附件解析与定向回读
                                 ├─ 配置和来源注册表读取
-                                ├─ WebSearchTool ──→ 本地 OpenWebSearch daemon
-                                ├─ WebFetchTool  ──→ 已获准来源的 HTML / PDF
+                                ├─ WebSearchTool ──→ DeepSeek 原生搜索（Messages API）
                                 ├─ 按需 DelegatePolicyTask ──→ 专项 Agent
                                 └─ 回答或按请求生成报告
 ```
 
-`src/main.py` 选择 WebUI 或 `--cli`，加载 `src/config/llm.yaml` 中的模型配置，并通过 `OpenWebSearchSupervisor` 管理本地搜索服务。WebUI 由 `src/agent/webui.py` 扩展 qwen-agent 的 Gradio 界面；CLI 在 `src/agent/cli.py`，两者使用同一个 `MainAgent`。模型可以是 DeepSeek、Kimi 或兼容 OpenAI API 的本地服务。
+`src/main.py` 选择 WebUI 或 `--cli`，加载 `src/config/llm.yaml` 中的模型配置，直接启动所选界面。搜索由 `src/websearch/deepseek.py` 直接调用 DeepSeek 的 Anthropic 兼容 Messages API，复用 `DEEPSEEK_API_KEY`，与聊天模型配置独立。WebUI 由 `src/agent/webui.py` 扩展 qwen-agent 的 Gradio 界面；CLI 在 `src/agent/cli.py`，两者使用同一个 `MainAgent`。模型可以是 DeepSeek、Kimi 或兼容 OpenAI API 的本地服务。
 
 `src/agent/main_agent.py` 的主 Agent 始终在 normal 模式。它根据用户范围和证据缺口决定直接回答、调用基础工具，或通过 `DelegatePolicyTask` 委派一个有边界的任务。可用专家包括来源检索、法规有效性、税务、资金合规、民商法和引用复核。专家返回结果后，主 Agent 决定是否还需进一步工作；代码不强制路由、检索、校验、分析、写报告的固定顺序。
 
@@ -23,7 +22,7 @@
 
 上传文件先由 `src/attachments/` 摄取。可内联的正文进入模型上下文；较大的文件保留文档 ID 和定位信息，由 `AttachmentReadTool` 按页、表格范围、行或关键词读取。附件内容是证据材料，不是指令。
 
-检索从 `src/sources/` 的人工注册表及配置开始。`WebSearchTool` 使用注册表、搜索服务与相关性筛选发现候选页面；需要引用的页面再交给 `WebFetchTool` 抓取正文。可抓取 URL 限于用户提供、搜索工具返回、注册表登记或已抓取页面链接中的地址。网页与 PDF 正文也按不可信材料处理。当前还没有可重复检索的本地 SQLite FTS 正文索引或完整的结构化证据账本。
+检索从 `src/sources/` 的人工注册表及配置开始。`WebSearchTool` 使用注册表、搜索服务与相关性筛选发现候选页面；搜索仅接收原生 `web_search_tool_result` 结构化 URL，模型生成的答复文本不作为搜索结果；失败不会回退其他搜索服务。匹配 URL 的引用摘录可作为已取得的文本片段，标题与注册表元数据仅是来源线索。旧 daemon、网页抓取和远程 PDF 读取链路已移除，运行时无需 Node.js；不得声称已打开网页或核验全文，摘录不足时报告证据缺口。搜索摘录和上传文件都按不可信材料处理。当前还没有可重复检索的本地 SQLite FTS 正文索引或完整的结构化证据账本。
 
 领域策略在 `src/config/*.yaml`，模型提示词在 `src/prompts/`，模板在 `src/templates/`。工具路径以 `src/` 为根目录。普通问题可直接回答；正式报告及其输出契约只在用户提出相应要求时使用。
 

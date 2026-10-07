@@ -10,6 +10,7 @@ dependencies = [
     "soundfile>=0.12.0",
     "socksio>=1.0.0",
     "pyyaml>=6.0",
+    "markdown-it-py[linkify]>=3.0",
     "pypdf>=4.0",
     "pdfplumber>=0.11",
     "openpyxl>=3.1",
