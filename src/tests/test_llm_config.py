@@ -14,10 +14,12 @@ def test_builtin_providers_are_available():
     assert available_providers(CONFIG_PATH) == ["deepseek", "kimi", "local"]
 
 
-def test_default_provider_is_local():
+def test_default_provider_is_deepseek(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
     config = load_llm_config(config_path=CONFIG_PATH)
-    assert config["model"] == "finance-27b"
-    assert config["api_key"] == "EMPTY"
+    assert config["model"] == "deepseek-v4-flash"
+    assert config["api_key"] == "test-key"
 
 
 def test_local_provider_uses_yaml_defaults():

@@ -1,24 +1,11 @@
-"""Configuration for the local web-search service.
-
-The agent normally starts and manages a localhost-only open-websearch daemon.
-Configuration is loaded when a tool/client is constructed rather than at module
-import time so tests and alternate deployments can inject their own settings.
-"""
+"""Configuration for DeepSeek native web search; no local daemon required."""
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
-
-
-def _env_bool(environ: dict[str, str], name: str, default: bool = False) -> bool:
-    value = environ.get(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+from src.config.env import environment
 
 
 def _env_int(
@@ -38,59 +25,57 @@ def _env_int(
 
 
 @dataclass(frozen=True)
-class WebSearchSettings:
-    """Runtime settings for the open-websearch adapter."""
+class DeepSeekSearchSettings:
+    """Messages API settings matching Harness's web-search-deepseek provider.
 
-    base_url: str = "http://127.0.0.1:3210"
-    timeout_seconds: int = 30
+    Search uses DEEPSEEK_API_KEY, independently of the main agent's provider.
+    Keys are resolved per request and never stored in these settings.
+    """
+
+    base_url: str = "https://api.deepseek.com/anthropic/v1"
+    model: str = "deepseek-v4-flash"
+    api_version: str = "2023-06-01"
+    max_tokens: int = 4096
+    max_uses: int = 5
+    timeout_seconds: int = 120
     max_results: int = 10
-    max_fetch_chars: int = 8_000
-    fallback_to_searxng: bool = False
-    allow_remote_service: bool = False
-    auto_start: bool = True
-    startup_timeout_seconds: int = 15
+    reasoning_effort: str = "low"
 
     @classmethod
-    def from_env(cls, environ: dict[str, str] | None = None) -> WebSearchSettings:
-        env = dict(os.environ if environ is None else environ)
-        allow_remote = _env_bool(env, "OPEN_WEBSEARCH_ALLOW_REMOTE", False)
-        base_url = env.get("OPEN_WEBSEARCH_URL", cls.base_url).strip().rstrip("/")
-        _validate_base_url(base_url, allow_remote=allow_remote)
+    def from_env(cls, environ: dict[str, str] | None = None) -> DeepSeekSearchSettings:
+        env = environment() if environ is None else dict(environ)
+        base_url = env.get("DEEPSEEK_SEARCH_BASE_URL", cls.base_url).strip().rstrip("/")
+        parsed = urlparse(base_url)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("DEEPSEEK_SEARCH_BASE_URL must be an HTTPS base URL without credentials")
+        model = env.get("DEEPSEEK_SEARCH_MODEL", cls.model).strip()
+        if not model:
+            raise ValueError("DEEPSEEK_SEARCH_MODEL must not be empty")
+        effort = env.get("DEEPSEEK_SEARCH_EFFORT", cls.reasoning_effort).strip().lower()
+        if effort not in {"low", "high", "max"}:
+            raise ValueError("DEEPSEEK_SEARCH_EFFORT must be low, high or max")
         return cls(
             base_url=base_url,
-            timeout_seconds=_env_int(
-                env, "WEBSEARCH_TIMEOUT_SECONDS", cls.timeout_seconds, minimum=1, maximum=120
-            ),
+            reasoning_effort=effort,
             max_results=_env_int(
                 env, "WEBSEARCH_MAX_RESULTS", cls.max_results, minimum=1, maximum=50
             ),
-            max_fetch_chars=_env_int(
-                env,
-                "WEBFETCH_MAX_CHARS",
-                cls.max_fetch_chars,
-                minimum=1_000,
-                maximum=8_000,
+            model=model,
+            max_tokens=_env_int(
+                env, "DEEPSEEK_SEARCH_MAX_TOKENS", cls.max_tokens, minimum=1, maximum=32768
             ),
-            fallback_to_searxng=_env_bool(env, "WEBSEARCH_FALLBACK_TO_SEARXNG", False),
-            allow_remote_service=allow_remote,
-            auto_start=_env_bool(env, "OPEN_WEBSEARCH_AUTOSTART", True),
-            startup_timeout_seconds=_env_int(
-                env,
-                "OPEN_WEBSEARCH_STARTUP_TIMEOUT_SECONDS",
-                cls.startup_timeout_seconds,
-                minimum=1,
-                maximum=120,
+            max_uses=_env_int(
+                env, "DEEPSEEK_SEARCH_MAX_USES", cls.max_uses, minimum=1, maximum=5
             ),
-        )
-
-
-def _validate_base_url(base_url: str, *, allow_remote: bool) -> None:
-    parsed = urlparse(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError("OPEN_WEBSEARCH_URL must be an HTTP(S) URL")
-    if parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise ValueError("OPEN_WEBSEARCH_URL must not contain credentials, query, or fragment")
-    if not allow_remote and parsed.hostname.lower() not in _LOCAL_HOSTS:
-        raise ValueError(
-            "OPEN_WEBSEARCH_URL must point to localhost unless OPEN_WEBSEARCH_ALLOW_REMOTE=true"
+            timeout_seconds=_env_int(
+                env, "DEEPSEEK_SEARCH_TIMEOUT_SECONDS", cls.timeout_seconds,
+                minimum=1, maximum=600,
+            ),
         )

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#164b87">
+  <title>小弛 · 税务工作辅助助手</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="/" aria-label="小弛首页"><span class="brand-mark">弛</span><span>小弛<small>税务工作辅助助手</small></span></a>
+      <button class="new-chat" id="new-chat"><span>＋</span> 新建对话 <kbd>新</kbd></button>
+      <div class="history-heading">历史对话 <span id="history-count">0</span></div>
+      <nav id="history" aria-label="历史对话"><p class="history-empty">从一个问题开始，<br>对话会自动保存在这里。</p></nav>
+      <div class="sidebar-bottom"><span class="status-dot"></span> 专注税务，辅助工作 <span class="version">小弛</span></div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+    <main>
+      <button class="menu-button" id="menu-button" aria-label="打开历史对话" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <section class="workspace">
+        <div class="welcome" id="welcome">
+          <div class="welcome-eyebrow"><span></span> 让政策更清晰，让工作更从容</div>
+          <h1>您好，我是<span>小弛</span></h1>
+          <p class="intro">您可以向我咨询税收政策、解读办税材料，<br class="desktop-break">或一起梳理思路，草拟一份工作答复。</p>
+          <div class="suggestions" id="suggestions"></div>
+          <div class="welcome-note"><span>◎</span> 提供适用地区、时间和具体情形，有助于获得更准确的答复。</div>
+        </div>
+        <div class="messages" id="messages" aria-live="polite" aria-label="对话内容"></div>
+        <div class="composer-area">
+          <div class="error" id="error" role="alert" hidden></div>
+          <div class="history-notice" id="history-notice" role="status" hidden>
+            <span>已删除对话</span><button type="button" id="undo-delete">撤销</button>
+          </div>
+          <form class="composer" id="chat-form">
+            <div class="attachment-list" id="attachments"></div>
+            <label class="sr-only" for="question">请输入您的税务问题</label>
+            <textarea id="question" rows="2" placeholder="请输入您的问题，也可以上传文件让我帮您解读…" maxlength="20000"></textarea>
+            <div class="composer-toolbar">
+              <button class="attach-button" type="button" id="attach-button" aria-label="上传附件"><span>＋</span> 上传材料</button>
+              <input type="file" id="file-input" accept=".pdf,.docx,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.markdown,.yaml,.yml" multiple hidden>
+              <span class="input-hint">Enter 发送 · Shift + Enter 换行</span>
+              <button class="send-button" id="send-button" type="submit" aria-label="发送问题">↑</button>
+            </div>
+          </form>
+          <p class="footer-note" id="footer-note">以上内容由 AI 生成，仅供参考，具体请以现行有效政策及主管税务机关确认口径为准。</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <dialog id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-description">
+    <h2 id="delete-heading">删除这条对话？</h2>
+    <p id="delete-description">将从历史列表中移除，删除后可以撤销。</p>
+    <p class="delete-title" id="delete-title"></p>
+    <div class="dialog-actions">
+      <button type="button" id="delete-cancel" autofocus>取消</button>
+      <button type="button" id="delete-confirm">删除对话</button>
+    </div>
+  </dialog>
+</body>
+</html>

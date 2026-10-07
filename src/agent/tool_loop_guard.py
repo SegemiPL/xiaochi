@@ -10,9 +10,6 @@ from typing import Any
 from qwen_agent.llm.schema import ASSISTANT, FUNCTION, USER, Message
 
 TERMINAL_TOOL_CODES = {
-    "already_fetched",
-    "fetch_budget_exhausted",
-    "previous_fetch_failed",
     "search_budget_exhausted",
 }
 

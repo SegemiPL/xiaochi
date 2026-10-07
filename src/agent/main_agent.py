@@ -5,12 +5,14 @@ from collections.abc import Iterator
 from datetime import datetime
 from enum import Enum
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from qwen_agent.agents import FnCallAgent
 from qwen_agent.llm import BaseChatModel
 from qwen_agent.llm.schema import USER, Message
 
 from src.agent.attachments import inline_uploaded_files, supported_formats_hint
+from src.agent.progress import progress_stage, report_progress
 from src.agent.subagent import (
     CitationVerifierSubAgent,
     CommercialLawAnalystSubAgent,
@@ -29,15 +31,14 @@ from src.agent.tool_loop_guard import (
 )
 from src.config.llm import load_llm_config
 from src.config.logger import attach_run_log
+from src.config.product import AGENT_NAME, PRODUCT
 from src.config.runtime import get_run_dir, new_run_id
-from src.config.webui import WEBUI_CHATBOT_CONFIG
 from src.prompts.prompts import MAIN_AGENT_SYS_PROMPT
 from src.tools.common import parse_tool_params
 from src.tools.delegate_policy_task import DelegatePolicyTask
 from src.tools.read_attachment import AttachmentReadTool  # noqa: F401
 from src.tools.read_markdown_files import MarkDownReadTool  # noqa: F401
 from src.tools.read_yaml_files import YamlReadTool  # noqa: F401
-from src.tools.web_fetch import WebFetchTool  # noqa: F401
 from src.tools.web_search import WebSearchTool  # noqa: F401
 from src.tools.write_result import WriteResult  # noqa: F401
 from src.websearch.provenance import register_user_provided_urls
@@ -57,8 +58,8 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
         llm: dict | BaseChatModel | None = None,
     ):
         subagent_tools = ['MarkDownReadTool', 'YamlReadTool', 'AttachmentReadTool']
-        retrieval_tools = subagent_tools + ['WebSearchTool', 'WebFetchTool']
-        verification_tools = subagent_tools + ['WebSearchTool', 'WebFetchTool']
+        retrieval_tools = subagent_tools + ['WebSearchTool']
+        verification_tools = subagent_tools + ['WebSearchTool']
         self.specialists = {
             'source_research': RagSubAgent(function_list=retrieval_tools, llm=llm),
             'validity_review': ValidateSubAgent(function_list=verification_tools, llm=llm),
@@ -79,16 +80,17 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
             'YamlReadTool',
             'AttachmentReadTool',
             'WebSearchTool',
-            'WebFetchTool',
             'WriteResult',
             self.delegate_tool,
         ]
         super().__init__(
             llm=llm,
             function_list=tools,
-            system_message=MAIN_AGENT_SYS_PROMPT,
-            name='3wagent',
-            description='跨境政策合规分析助手：资金合规、税务、民商法多领域协同分析。',
+            system_message=(MAIN_AGENT_SYS_PROMPT + '\n当前日期（北京时间）：'
+                            + datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+                            + '。相对日期按此日期理解；用户指定的政策所属期另行遵守。'),
+            name=AGENT_NAME,
+            description=PRODUCT['tagline'],
         )
         self.mode = AgentMode.NORMAL
         # A transient capability label for the WebUI; this is not a workflow step.
@@ -100,9 +102,8 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
         lang: Literal['en', 'zh'] = 'en',
         **kwargs,
     ) -> Iterator[list[Message]]:
-        # A retry after a failed run can append the same user input twice (the
-        # WebUI persists the input before the run finishes); collapse the
-        # duplicate so neither the model nor the saved history sees it.
+        # Legacy histories may contain duplicate user input from failed retries.
+        # Collapse it so neither the model nor the saved history repeats it.
         if (
             len(messages) >= 2
             and messages[-1].role == USER
@@ -166,11 +167,23 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
             for fin in self._call_llm(messages=final_messages, functions=[]):
                 yield clean_rsp + fin
 
+    def _call_llm(self, messages, functions=None, stream=True, extra_generate_cfg=None):
+        report_progress('thinking' if functions else 'writing')
+        for frame in super()._call_llm(messages, functions, stream, extra_generate_cfg):
+            if frame and frame[-1].get('content') and not frame[-1].get('function_call'):
+                report_progress('writing')
+            yield frame
+
     def _call_tool(self, tool_name, tool_args='{}', **kwargs):
         self.current_step = f'按需调用：{tool_name}'
         self._record_capability_use(tool_name, tool_args)
         try:
-            result = super()._call_tool(tool_name, tool_args, **kwargs)
+            stage = {
+                'WebSearchTool': 'searching', 'DelegatePolicyTask': 'specialist',
+                'WriteResult': 'writing',
+            }.get(tool_name, 'reading')
+            with progress_stage(stage):
+                result = super()._call_tool(tool_name, tool_args, **kwargs)
             raise_for_terminal_tool_result(tool_name, result)
             return result
         finally:
@@ -212,24 +225,15 @@ def _message_text(message: Message) -> str:
     return str(content or '')
 
 
-def run_3wagent(model_name=None, provider=None, config_path=None):
-    # Imported lazily so headless usage/tests don't require qwen-agent[gui]
-    from src.agent.webui import ThemedWebUI
+def run_3wagent(model_name=None, provider=None, config_path=None, host='127.0.0.1', port=8000):
+    """Launch Xiaochi's independent Web app; keep the legacy entrypoint name compatible."""
+    import uvicorn
 
-    # Define Agent
-    bot = MainAgent(
-        llm=load_llm_config(
-            model_name=model_name,
-            provider=provider,
-            config_path=config_path,
-        )
-    )
+    from src.web.app import create_app
 
-    # Run The GUI Agent
-    ThemedWebUI(
-        bot,
-        chatbot_config=WEBUI_CHATBOT_CONFIG
-    ).run()
+    def build_agent():
+        return MainAgent(llm=load_llm_config(
+            model_name=model_name, provider=provider, config_path=config_path,
+        ))
 
-if __name__ == "__main__":
-    run_3wagent()
+    uvicorn.run(create_app(agent_factory=build_agent), host=host, port=port)

@@ -15,7 +15,7 @@ from src.agent.subagent import ModeDetector
 def test_extract_last_assistant_text_ignores_tools_and_other_agents():
     messages = [
         Message(ASSISTANT, "子代理内容", name="rag_subagent"),
-        Message(FUNCTION, "工具结果", name="WebFetchTool"),
+        Message(FUNCTION, "工具结果", name="WebSearchTool"),
         Message(ASSISTANT, "最终回答", name="3wagent"),
     ]
 

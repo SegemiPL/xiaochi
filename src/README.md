@@ -1,243 +1,135 @@
-# 3wagent 运行与配置
+# 小弛运行与配置
 
-`src/` 是当前运行时根目录，使用 [qwen-agent](https://github.com/QwenLM/qwen-agent) 管理对话与工具调用。运行所需的配置、来源注册表、模板与 Web Search 服务均位于其中。
+`src/` 是当前运行时根目录，使用 qwen-agent 的 `FnCallAgent` 管理工具和内部对话。独立 Web 前端、FastAPI 服务与 CLI 共享同一 Agent 核心。
 
-> 当前组件和数据流见 [`docs/architecture.md`](docs/architecture.md)。
-> 面向 42 道测试题的能力路线图及实时实现状态见
-> [`docs/agent-capability-roadmap.md`](docs/agent-capability-roadmap.md)。
+[架构与资料流](docs/architecture.md) · [能力与验收状态](docs/agent-capability-roadmap.md)
 
-## 当前状态
+## 启动
 
-主 Agent 已可在 WebUI 与 CLI 中运行，并可选择 DeepSeek、Kimi 或本地兼容 OpenAI API 的模型。附件摄取、来源搜索、正文抓取与按需专家委派已经接入；能力覆盖和端到端可靠性仍按路线图持续验证。不存在所有问题必须经过的固定子代理流水线。
+仓库根目录 `.env` 的格式为 `DEEPSEEK_API_KEY=你的密钥`。`config/env.py` 使用固定仓库路径加载，禁止变量插值、保留现有环境变量，Web、CLI 和直接搜索调用共享配置。文件由 `.gitignore` 排除；本机已创建的文件权限为 0600，其他部署环境请自行设置文件权限。内容更新后重启服务。首次加载后搜索仍逐次读取当前进程环境，支持环境内轮换。
 
-## 目录结构
-
-```
-src/
-├── main.py                 # WebUI / CLI 入口与搜索服务管理
-├── pyproject.toml          # 独立包 3wagent-refactor，依赖 qwen-agent[gui,python-executor]
-├── environment.yml         # 等价的 conda 环境定义（python 3.12）
-├── agent/
-│   ├── attachments.py      # 将上传的文本附件安全地内联到模型上下文
-│   ├── main_agent.py       # 自适应 MainAgent(FnCallAgent)
-│   ├── cli.py              # 终端交互界面
-│   ├── webui.py            # Gradio 界面与历史对话
-│   └── subagent.py         # 按需调用的专项 Agent
-├── config/
-│   ├── llm.py              # LLM provider 配置加载器
-│   ├── llm.yaml            # DeepSeek / Kimi / local provider 配置
-│   ├── webui.py            # Gradio WebUI 的 chatbot 配置（prompt 建议）
-│   ├── logger.py           # 单轮日志写入 src/workspace/<run-id>/logs/<model>.log
-│   └── *.yaml              # 路由、法域、来源等级与输出契约
-├── sources/                # 各法域官方来源注册表
-├── templates/              # 报告与检索任务模板
-├── infra/open-websearch/   # 固定版本的本地 Web Search daemon
-├── tools/
-│   ├── read_markdown_files.py  # MarkDownReadTool
-│   ├── read_yaml_files.py      # YamlReadTool
-│   ├── web_search.py           # WebSearchTool（候选来源发现）
-│   └── web_fetch.py            # WebFetchTool（网页正文抓取）
-├── websearch/
-│   ├── client.py               # open-websearch daemon HTTP 客户端
-│   ├── policy.py               # 法域搜索引擎和官方域名策略
-│   └── protocol.py             # 稳定的内部返回结构
-├── prompts/
-│   └── prompts.py          # MAIN_AGENT_SYS_PROMPT 系统提示词
-├── reports/                # 按请求生成的正式报告（Git 忽略）
-└── workspace/              # 对话、单轮运行产物与日志（Git 忽略）
-```
-
-## 运行方式
+在仓库根目录执行。需要 Python 3.11+；联网搜索和默认聊天复用 `DEEPSEEK_API_KEY`。程序自动加载仓库根目录 `.env`，也支持维护人员设置进程环境变量；已有环境变量优先，不应把密钥写入 YAML、浏览器或 Git。
 
 ```bash
-# 在项目根目录（src/ 的上一级）执行
 uv sync --project src
-npm ci --prefix src/infra/open-websearch
-src/.venv/bin/python -m src.main                         # 默认 local 模型、WebUI
-src/.venv/bin/python -m src.main --provider deepseek
-src/.venv/bin/python -m src.main --provider kimi
-src/.venv/bin/python -m src.main --cli --provider deepseek  # 终端交互
+src/.venv/bin/python -m src.main                       # 默认 DeepSeek，Web 地址 127.0.0.1:8000
+src/.venv/bin/python -m src.main --cli                 # 只显示最终答复的终端界面
+src/.venv/bin/python -m src.main --port 8002
+src/.venv/bin/python -m src.main --provider kimi       # 需要 MOONSHOT_API_KEY
 src/.venv/bin/python -m src.main --provider local --model <model-name>
-src/.venv/bin/python -m src.main -d                       # DEBUG 模式
+src/.venv/bin/python -m src.main --llm-config path/to/my-llm.yaml --provider my-provider
 ```
 
-启动时会自动探测并启动本地 open-websearch daemon，随后打开 qwen-agent
-内置的 Gradio WebUI（加上 `--cli` 时进入终端交互）。程序退出时会关闭本次启动的 daemon；如果 daemon
-原本已经运行，则只复用、不关闭。
+网页启动时加载 `.env`，但不创建模型，首条问题才加载模型配置；没有密钥也可预览界面。未配置模型时问题接口返回提示，不泄露配置路径或异常详情。CLI 在启动时加载模型。默认绑定 `127.0.0.1`，可通过 `--host` 指定已有受控部署的绑定地址。
 
-### 外部模型 API + 本地 Agent
+当前为本地单用户应用，没有用户登录与权限隔离。原核心使用全局运行目录和附件会话状态，因此同一进程每次只处理一个问题；忙时返回重试提示，不应启用多个 workers。
 
-`src/config/llm.yaml` 是 LLM provider 的配置入口，当前内置 `deepseek`、
-`kimi` 和原有的 `local` 三个配置。DeepSeek 与 Kimi 都使用 OpenAI-compatible
-Chat Completions 接口；API key 只从环境变量读取，不应写进 YAML 或提交到 Git。
+## 产品与展示
 
-先设置对应密钥：
+`config/xiaochi.yaml` 管理产品名称、默认法域、服务场景、话术、快捷问题与免责声明。主提示词要求中文、礼貌简洁、结论在前，必要时列适用条件和官方依据，只询问影响答复的关键事实。正式报告与答复草稿使用 `config/output-contract.yaml` 和 `templates/report.md`，草稿须经工作人员审核。
 
-```bash
-export DEEPSEEK_API_KEY="你的 DeepSeek API key"
-# 或：export MOONSHOT_API_KEY="你的 Kimi API key"
-```
+普通咨询默认约 300 字。对于缺少主体、地区或资金条件的操作问题，先确认最多三项关键事实，再进行对应检索，不延伸用户未问的议题；明确要求政策原文、官方出处或详细分析时仍按需检索。
 
-然后启动：
+Web 与 CLI 都完整消费 Agent 运行，再从最后一个主 Agent 消息提取最终答复。工具调用结束、专家输出或仅思考的尾消息不能充当最终答复。每条最终答复由 `agent/public_answer.py` 统一追加 AI 生成提示。Web 不发送中间帧或内部推理事件；等待时按实际执行显示“小弛正在分析问题／检索官方政策／核对检索来源／整理答复……”及等待秒数。
 
-```bash
-python -m src.main --provider deepseek
-python -m src.main --provider kimi
-python -m src.main --llm-config path/to/my-llm.yaml --provider my-provider
-```
+前端每秒查询本轮 UUID 对应的进度接口，仅返回固定阶段、状态和耗时。`agent/progress.py` 使用请求上下文隔离通知，`web/progress.py` 保存最多 128 条内存快照，完成或失败即冻结；服务重启后快照清空，不作为持久化答复。接口不发送查询词、文件路径、专家内容或模型思考。
 
-如需换模型，可以用 `--model` 覆盖 YAML 中的模型名；如需新增 provider，复制
-`llm.yaml` 中的一个 provider，修改 `model`、`model_server` 和 `api_key_env` 即可。
-如果不想修改仓库内的默认文件，可用 `--llm-config path/to/my-llm.yaml` 指向自己的配置。
+历史接口只返回公开消息及附件名称。旧记录通过公开投影恢复，过滤工具、思考和内联附件正文；模型继续使用完整的内部上下文。前端使用 `web/markdown.py` 统一渲染新答复与历史 Markdown，支持 `**中文：**①` 等中文标点边界的加粗；代码块和转义星号保留字面形式。禁用原始 HTML，保留政策链接并支持复制答复。
 
-### 远程部署模型 + 本地 Agent（兼容保留）
+## 附件与持久化
 
-LLM 推理服务可以运行在远程 GPU 服务器，Agent、Gradio WebUI 和 Web
-Search 运行在本地。推荐启动顺序如下。
+支持 PDF、DOCX、表格、CSV 和文本等已注册格式。每条问题最多 5 个附件，单文件最多 25 MB。上传接口返回对话范围内的不透明 ID 与文件名，不接受客户端指定服务器路径。
 
-1. 在远程服务器启动 OpenAI API 兼容的 LLM 推理服务。
-2. 通过 SSH 将远程推理端口转发到本地 `127.0.0.1:11434`。例如远程服务
-   监听 `8000` 时：
+- `workspace/conversations/<id>.json`：内部 `messages` 与公开 `public_messages`。均属服务器私有存储。
+- `workspace/web_uploads/<conversation-id>/<upload-id>/`：上传原文件及名称元数据。
+- `workspace/attachments/<document-id>/`：附件解析结果和定向回读索引。
+- `workspace/<run-id>/`：日志、专家结果和能力轨迹。
+- `reports/`：按请求生成的报告文件。
 
-   ```bash
-   ssh -N -L 11434:127.0.0.1:8000 <user>@<server>
-   ```
+服务器仅挂载 `web/static/`，不暴露 workspace、日志或模型配置目录。附件先解析并内联或形成文档 ID；后续可通过 `AttachmentReadTool` 按页、工作表、行或关键词回读。点击新建对话不会删除已有记录。
 
-3. 首次使用时，在本地安装 OpenWebSearch 的固定版本依赖：
+## 模型与搜索
 
-   ```bash
-   npm ci --prefix src/infra/open-websearch
-   ```
+聊天配置位于 `config/llm.yaml`，默认 provider 为 `deepseek`。`--provider` 优先于 `LLM_PROVIDER` 和 YAML 默认值；`--model` 可覆盖模型 ID，`--llm-config` 可指向其他配置。provider 包含 `model`、`model_server`、`api_key_env`、`generate_cfg`。
 
-4. 确认本地能够访问转发后的 LLM API：
-
-   ```bash
-   curl http://127.0.0.1:11434/v1/models
-   ```
-
-5. 在项目根目录启动 Agent：
-
-   ```bash
-   python -m src.main
-   # 或指定远程推理服务中加载的模型名
-   python -m src.main -m <model-name>
-   ```
-
-程序随后会自动启动本地 OpenWebSearch、启动 Gradio WebUI，并在终端输出
-WebUI 地址。浏览器中的 Agent 会自动获得 `WebSearchTool` 和
-`WebFetchTool`；专业政策问题进入检索、法规有效性验证或引用核验阶段时，
-Agent 会按需调用这些工具，简单对话通常不会触发搜索。
-
-WebUI 会把每个对话的完整上下文自动保存到
-`src/workspace/conversations/<conversation-id>.json`。左侧“历史对话”可以恢复此前
-对话并继续追问；点击“新对话”会清空当前页面上下文，但不会删除已保存记录。
-
-LLM 请求通过 SSH 隧道发送到远程服务器；搜索引擎访问和官方网页抓取则
-从本地机器发起，因此本地网络必须能够访问所选搜索引擎及目标网站。
-OpenWebSearch 启动日志位于：
-
-```text
-src/workspace/logs/open-websearch.log
-```
+本地模型可通过 SSH 隧道接入，例如 `ssh -N -L 11434:127.0.0.1:8000 <user>@<server>`，然后选择 `--provider local`。聊天选择其他模型时，联网搜索仍调用 DeepSeek，仍需其密钥。
 
 ### Web Search 配置
 
-Web Search 使用独立的本地 `open-websearch` daemon。安装与启动方法见
-[`infra/open-websearch/README.md`](infra/open-websearch/README.md)。默认地址为
-`http://127.0.0.1:3210`。
+`WebSearchTool` 直接采用 DeepSeek Harness 的 `web-search-deepseek` 协议：
+向 `https://api.deepseek.com/anthropic/v1/messages` 发起独立的 Messages 请求，
+声明原生服务端工具 `web_search_20250305`。默认模型、输出上限和搜索次数与
+[官方 Harness](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/web/web-search-deepseek)
+一致。每次搜索消耗一个模型轮次，最多触发 5 次服务端搜索。
 
-可用环境变量：
+搜索与 DeepSeek 聊天共用 `DEEPSEEK_API_KEY`，每次请求从环境重新读取，因此密钥轮换
+不需要重建客户端。聊天选择 Kimi 或本地模型时，联网搜索仍使用 DeepSeek。
+搜索端点独立于聊天端点，不继承 `DEEPSEEK_BASE_URL`。
+
+搜索请求使用 `output_config.effort=low`，官方 DeepSeek 路由的相关性判断使用 `reasoning_effort=low`，主回答保留聊天配置中的推理设置。参数见 [DeepSeek 推理模式说明](https://api-docs.deepseek.com/guides/thinking_mode/)。
 
 | 变量 | 默认值 | 说明 |
-|---|---:|---|
-| `OPEN_WEBSEARCH_URL` | `http://127.0.0.1:3210` | daemon 地址；默认只允许 localhost |
-| `OPEN_WEBSEARCH_ALLOW_REMOTE` | `false` | 显式允许远程 daemon，不建议日常开启 |
-| `OPEN_WEBSEARCH_AUTOSTART` | `true` | 随 `python -m src.main` 自动启动本地 daemon |
-| `OPEN_WEBSEARCH_STARTUP_TIMEOUT_SECONDS` | `15` | daemon 就绪等待时间，范围 1–120 秒 |
-| `OPEN_WEBSEARCH_PROXY_URL` | 空 | daemon 专用 HTTP(S) 代理；未设置 `USE_PROXY` 时优先使用 |
-| `USE_PROXY` / `PROXY_URL` | 自动推断 | open-webSearch 原生代理开关；显式设置时优先级最高 |
-| `WEBSEARCH_TIMEOUT_SECONDS` | `30` | 单次 HTTP 调用超时，范围 1–120 秒 |
-| `WEBSEARCH_MAX_RESULTS` | `10` | 搜索结果硬上限，范围 1–50 |
-| `WEBFETCH_MAX_CHARS` | `8000` | 单页正文字符硬上限，范围 1000–8000 |
-| `WEBSEARCH_FALLBACK_TO_SEARXNG` | `false` | open-websearch 失败或无结果时回退旧 SearXNG |
+|---|---|---|
+| `DEEPSEEK_API_KEY` | 必需 | 与 DeepSeek 聊天使用同一密钥 |
+| `DEEPSEEK_SEARCH_BASE_URL` | `https://api.deepseek.com/anthropic/v1` | HTTPS 搜索基址，自动追加 `/messages` |
+| `DEEPSEEK_SEARCH_MODEL` | `deepseek-v4-flash` | 独立搜索模型，与 Harness 默认值一致，可显式覆盖 |
+| `DEEPSEEK_SEARCH_EFFORT` | `low` | 搜索推理强度，支持 `low`、`high`、`max`；不改变主回答设置 |
+| `DEEPSEEK_SEARCH_MAX_TOKENS` | `4096` | 单次输出 token 上限，范围 1–32768 |
+| `DEEPSEEK_SEARCH_MAX_USES` | `5` | 单次服务端搜索次数上限，范围 1–5 |
+| `DEEPSEEK_SEARCH_TIMEOUT_SECONDS` | `120` | 搜索 HTTP 超时，范围 1–600 秒 |
+| `WEBSEARCH_MAX_RESULTS` | `10` | 提供给 agent 的候选结果上限，范围 1–50 |
 
-若没有显式配置 `USE_PROXY`，启动器会把现有的 `HTTPS_PROXY`/`https_proxy` 或
-`HTTP_PROXY`/`http_proxy` 转换为 open-webSearch 要求的 `USE_PROXY=true` 与
-`PROXY_URL`。显式设置 `USE_PROXY=false` 可关闭自动继承。代理设置只在 daemon
-启动时读取；修改环境变量后需要重启 3wagent 和仍在后台运行的旧 daemon。
-若端口上已有 daemon，但其代理开关与当前进程要求不一致，3wagent 会拒绝静默
-复用并给出重启提示，避免继续把不可用的海外引擎包装成正常搜索。
+只接受 `web_search_tool_result` 中的结构化结果；标题、URL、`page_age` 保留为
+来源元数据，匹配 URL 的 `cited_text` 拼接为摘要。重复 URL 去重，超量结果会被截断并标记；
+模型生成的答复正文不会作为搜索结果，也不会从中提取 URL。没有结构化搜索块、原生工具错误、
+HTTP 错误或缺少密钥都返回明确错误；不会自动切换到 DuckDuckGo、Bing 或 SearXNG。
+同一工具在本轮发生提供方故障后暂停后续联网搜索，下轮重新尝试，本地注册表与附件仍可读取。
+密钥不会写入返回结果或 `workspace/<run-id>/logs/deepseek_search_requests.jsonl` 请求轨迹。
 
-检索遵循：本地 `sources/` registry 优先，开放网络仅作补充；搜索摘要只能用于发现候选 URL，必须通过 `WebFetchTool` 获取官方页面正文后才能作为证据。法域对应的引擎与官方域名配置位于 `config/jurisdictions.yaml`。
+检索仍遵循：来源注册表辅助、准确标题查询、相关性审查与官方域优先。必要时进行一次有界
+`site:` 查询重试，结果仍通过 DeepSeek 获取。标题与注册表元数据仅用于发现候选 URL；引用摘录可用于支持其覆盖范围内的结论。
+`WebSearchTool` 自动读取相关官方 HTML 正文，返回 `source_text`、`source_url`、`source_title`、`source_read_at`、`source_sha256`、`source_truncated` 与 `source_status`；失败返回 `source_error`。`official_text_results` 和 `official_excerpt_results` 分别统计正文及引用摘录，两者都没有时标记 `leads_only`。
 
-`WebSearchTool` 会按查询内容自动匹配来源注册表；精确命中时直接返回已登记来源，
-不消耗开放搜索请求。开放搜索结果会经过与主题无关的标题/摘要相关性评分，低相关
-页面不会暴露给 Agent。若普通搜索没有相关的官方结果，但能够从注册表或候选结果
-识别主管机关域名，工具会进行一次有界的官方域搜索。发生 302、验证码等引擎故障
-后，该引擎会在本次运行的后续查询中自动停用，并在结果元数据中报告。
+`websearch/sources.py` 每批并行读取至多三个官方候选，均失败时继续尝试后续候选；成功正文缓存 15 分钟、最多 128 条。每页 12 秒 HTTP 超时、2 MiB 下载上限，返回至多 16000 字符并标记截断。仅请求配置中的官方域名，跳转重新校验，拒绝内网地址和凭据 URL；网页请求不携带 DeepSeek 密钥。成功读取不代表政策仍然有效，Agent 仍须判断用户时点、适用对象和版本关系。
 
-对于标记为 `CN` 且包含外汇、汇发、跨境贸易、资本项目或经常项目等关键词的
-查询，`WebSearchTool` 会先调用 SAFE 官网的固定站内检索入口；只要获得结果，
-便直接返回官方域名候选，不再同时调用通用搜索引擎。SAFE 的政策法规、行政规范
-性文件和网上服务索引页若被通用正文抽取器误识别为页脚，`WebFetchTool` 会从
-固定的 SAFE HTTPS 主机读取原始 HTML，并返回紧凑的标题、日期与具体页面链接。
-该回退仅适用于三个预先允许的索引路径，不会接受模型提供的任意站点或路径。
+保留主 Agent 自主选择工具、专家和研究停止时点。已撤销三次共享网络预算和 URL-only 强制结束，保留原有每 Agent 15 次搜索保护及重复查询检查。官方域名配置位于 `config/jurisdictions.yaml`，搜索提供方统一为 `deepseek-official`。
 
-远程 PDF 与上传 PDF 使用两条通用读取链路：`WebFetchTool` 会将来源校验通过的
-公共 PDF URL 下载后用 pypdf 转换为带页码的正文；用户上传的 PDF 则由附件摄取
-层解析为带 `pdf:pN` locator 的内容，未内联页面通过 `AttachmentReadTool` 读取。
-这两项工具都向需要读取来源正文的 agent 开放，不依赖特定网站或 URL 路径。
+DeepSeek HTTP 客户端遵循标准 HTTP(S) 代理环境变量。旧 OpenWebSearch daemon、
+SearXNG 工具、SAFE 站内搜索及 WebFetchTool 已删除，不再读取旧 daemon／抓取配置。
+上传 PDF 仍由附件摄取层解析，支持通过 `AttachmentReadTool` 按 `pdf:pN` 回读。
 
-`WebFetchTool` 只接受用户当前消息明确提供的 URL、本轮 `WebSearchTool` 实际
-返回的 URL、`sources/` registry 中登记的 URL，或已抓取页面中的链接。模型根据标题、日期、文号或
-其他页面路径自行拼接的 URL 会在联网前被拒绝；同一个返回 404 的 URL 在
-本轮不会被再次请求。遇到 404 时，应按准确标题和文号搜索一次替代官方入口，
-仍未找到则明确记录证据缺口，不得继续猜测路径。
+## 目录与接口
 
-每个 agent 对同一个规范化 URL 最多成功抓取一次；再次请求不会访问网络，
-也不会把相同正文重复写入上下文。若模型在成功抓取、已知失败或搜索/抓取
-预算耗尽后仍继续调用工具，agent 运行层会终止工具循环，并进行一次禁用工具的
-最终总结。该限制是 agent 实例级的：检索与核验 agent 仍可各自独立获取同一来源。
-
-网络超时等可重试错误对同一 URL 最多进行两次真实请求；不可重试错误只请求
-一次，之后的同 URL 调用直接进入终态。参数错误不会消耗抓取预算。Python 客户端
-会拒绝传统数字形式的私网 IP，并在调用 daemon 前检查 DNS 结果；bundled
-`open-websearch` 还会对每次重定向及浏览器导航重复执行公网地址校验。
-
-### LLM 配置
-
-LLM 配置位于 `src/config/llm.yaml`，由 `src/config/llm.py` 加载。provider 的结构为：
-
-- `model`: 服务商要求的模型 ID
-- `model_server`: OpenAI-compatible base URL
-- `api_key_env`: 存放密钥的环境变量名
-- `generate_cfg`: qwen-agent 的生成参数
-
-不同服务商对生成参数的约束可能不同；例如内置 Kimi K2.5 配置默认不额外传递
-`temperature` 和 `top_p`。
-
-也可以设置 `LLM_PROVIDER=kimi`，作为 `--provider` 之外的环境变量方式。
-
-## 架构要点
-
-| 维度 | 说明 |
+| 组件 | 文件与作用 |
 |---|---|
-| Agent 基类 | `FnCallAgent`（function-call 风格，非 Assistant/ReActChat） |
-| 前端 | qwen-agent 内置 `qwen_agent.gui.WebUI`（Gradio） |
-| 工具注册 | `@register_tool` + `BaseTool`，在 `main_agent.py` 中 import 触发注册，以字符串名传给 `function_list`（未使用 MCP） |
-| 系统提示词 | `MAIN_AGENT_SYS_PROMPT`，定义 normal 模式下的自适应回答、证据边界与按需专家委派规则 |
-| 领域策略 | `src/config/*.yaml`（工具中的运行时相对路径为 `config/*.yaml`），由提示词引导模型用 `YamlReadTool` 自行读取 |
+| Agent 核心 | `agent/main_agent.py`、`agent/subagent.py`；自适应工具选择与可选专家 |
+| 公开答复边界 | `agent/public_answer.py`；最终答复提取、旧记录过滤、统一提示语 |
+| 会话执行 | `web/service.py`；串行执行、附件上下文、内部与公开持久化 |
+| HTTP 接口 | `web/app.py`；会话列表、历史、新建、上传、最终答复 |
+| 独立前端 | `web/static/`；HTML/CSS/JavaScript，无构建步骤或 CDN |
+| 产品配置 | `config/xiaochi.yaml`、`config/product.py` |
+| CLI | `agent/cli.py`；保留内部多轮上下文，公开最终答复 |
+| 检索 | `websearch/` 与 `tools/web_search.py` |
 
-主要工具：
+只读接口包括 `GET /api/config`、`GET /api/conversations`、`GET /api/conversations/{id}` 及本轮 UUID 的进度接口。写接口为新建、上传、消息、`DELETE /api/conversations/{id}` 与 `POST /api/conversations/{id}/restore`。删除和恢复仅返回 ID 与状态，不返回内部上下文。删除采用 `.trash/` 可恢复记录，附件和运行日志保留；同一运行锁保护消息与历史管理，正在处理问题时返回 409。消息接口完整结束后一次返回 `answer` 与 `answer_html`，不支持过程流。
 
-- **MarkDownReadTool** — 读取 Markdown 文件全文（入参 `file_path`）
-- **YamlReadTool** — 读取 YAML 文件全文（入参 `file_path`）
-- **WebSearchTool** — 调用 open-websearch 搜索候选来源并标记官方域名
-- **WebFetchTool** — 抓取候选页面正文和来源元数据；网页内容始终视为不可信证据
-- **DelegatePolicyTask** — 仅在复杂问题确有必要时运行一个有界专家任务；不会启动固定流水线
+## 验证
 
-## 当前自适应执行方式
+先安装开发依赖，再运行离线测试：
 
-`MainAgent._run()` 会先解析附件，然后让同一个 normal 模式主 agent 根据问题本身选择最小能力集合：可以直接回答，可以调用附件、配置、搜索和抓取工具，也可以通过 `DelegatePolicyTask` 单独委派来源检索、有效性核验、税务、资金合规、商事或引用复核。代码不再预设 Routing → RAG → Validate → Analyst → Citation → Report 的执行顺序。
+```bash
+uv sync --project src --extra dev
+src/.venv/bin/python -m pytest -q src/tests
+```
 
-每次工具选择写入当前 `workspace/<run-id>/capability_trace.jsonl`，用于调试实际采用的能力及原因。正式报告只在用户明确要求时使用输出契约；后续重点是扩大端到端评测样本、完善检索快照归档，并根据真实失败情况决定是否启用 Playwright 浏览器兜底。
+自动化测试包括多轮会话、历史投影、删除/撤销与运行互斥、附件隔离、最终答复提示、Markdown、进度与官方正文读取。199 项离线回归和八个真实场景通过，包含一项基于官方正文的政策回归；广泛税务政策质量及 42 题评测尚未完成。完整状态见能力路线图。
+
+可复现真实模型迭代：
+
+```bash
+src/.venv/bin/python -m src.evals.xiaochi_smoke
+```
+
+该命令会调用 DeepSeek；使用独立临时会话，记录状态、答复、检查项、实际阶段和耗时到 `workspace/eval/xiaochi-smoke.json`，不记录密钥、请求头或完整模型配置，关闭后删除临时会话。检查覆盖身份、给定税率的纯算术、多轮改写、关键澄清、附件、官方链接定位及外籍个人分红公告的文件、文号、执行日期、适用对象、税率与旧条款废止。
+
+原生搜索可能只有结构化链接，没有 `citations[].cited_text`。程序不把生成摘要或不透明 `encrypted_content` 当政策原文；官方 HTML 阅读补齐正文链路。外籍个人分红用例取得官方正文，完整回答 55.24 秒、四次搜索工具调用；此前简短缺口答复不能作为成功提速基准。远程 PDF、动态页面及长文定向回读尚未实现。

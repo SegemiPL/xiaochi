@@ -1,37 +1,62 @@
-# 3wagent 当前架构
+# 小弛当前架构
 
-本文描述 `src/` 中正在使用的运行时。能力覆盖情况与未完成事项以[能力路线图](agent-capability-roadmap.md)为准；[SQLite FTS 文档](sqlite-fts-rag-plan.md)描述计划中的本地索引，不代表已部署组件。
+本文描述 `src/` 中正在使用的运行时。小弛基于 3wagent 的核心，面向政府税务部门工作人员；历史跨境专项能力保留为按需专家。验收与未完成事项见[能力路线图](agent-capability-roadmap.md)。[SQLite FTS 文档](sqlite-fts-rag-plan.md)描述计划中的索引，尚未部署。
 
 ## 组件与边界
 
 ```text
-用户 ──→ Gradio WebUI / CLI ──→ MainAgent（qwen-agent FnCallAgent）
-                                │
-                                ├─ 附件解析与定向回读
-                                ├─ 配置和来源注册表读取
-                                ├─ WebSearchTool ──→ 本地 OpenWebSearch daemon
-                                ├─ WebFetchTool  ──→ 已获准来源的 HTML / PDF
-                                ├─ 按需 DelegatePolicyTask ──→ 专项 Agent
-                                └─ 回答或按请求生成报告
+浏览器：独立 HTML/CSS/JS 聊天页
+    → FastAPI 接口（公开消息与最终答复）
+        → ChatService（串行运行，附件与双份历史）
+            → MainAgent（qwen-agent FnCallAgent）
+                ├─ 附件解析与定向回读
+                ├─ 配置及来源注册表读取
+                ├─ WebSearchTool → DeepSeek Messages 原生搜索
+                └─ 按需 DelegatePolicyTask → 专项 Agent
+
+CLI → 同一 MainAgent → 最终答复边界
 ```
 
-`src/main.py` 选择 WebUI 或 `--cli`，加载 `src/config/llm.yaml` 中的模型配置，并通过 `OpenWebSearchSupervisor` 管理本地搜索服务。WebUI 由 `src/agent/webui.py` 扩展 qwen-agent 的 Gradio 界面；CLI 在 `src/agent/cli.py`，两者使用同一个 `MainAgent`。模型可以是 DeepSeek、Kimi 或兼容 OpenAI API 的本地服务。
+`src/main.py` 默认启动绑定 `127.0.0.1:8000` 的 FastAPI 服务，`--cli` 启动终端模式。`src/web/static/` 为无构建步骤的独立前端，原 Gradio 界面及依赖入口已删除。`src/config/llm.yaml` 默认选择 DeepSeek，也支持 Kimi 和本地兼容 OpenAI API 的模型。启动时自动加载仓库根目录 `.env`，已有环境变量优先；网页首条问题才创建模型。
 
-`src/agent/main_agent.py` 的主 Agent 始终在 normal 模式。它根据用户范围和证据缺口决定直接回答、调用基础工具，或通过 `DelegatePolicyTask` 委派一个有边界的任务。可用专家包括来源检索、法规有效性、税务、资金合规、民商法和引用复核。专家返回结果后，主 Agent 决定是否还需进一步工作；代码不强制路由、检索、校验、分析、写报告的固定顺序。
+搜索由 `src/websearch/deepseek.py` 调用 DeepSeek Anthropic 兼容 Messages API，使用 `web_search_20250305`，与聊天共用 `DEEPSEEK_API_KEY`。搜索端点独立于聊天模型和端点；没有 daemon、Node.js 或旧引擎回退。
 
-## 证据与资料流
+`MainAgent` 统一使用 normal 模式，按问题与证据缺口选择工具。普通问题直接回答；复杂事项可委派来源检索、有效性、税务或引用复核。涉外问题可按需使用资金合规和民商法专家，默认不扩展其他法域。主 Agent 获得北京时间的当前日期，用户指定的所属期独立遵守。代码不强制固定研究流水线。
 
-上传文件先由 `src/attachments/` 摄取。可内联的正文进入模型上下文；较大的文件保留文档 ID 和定位信息，由 `AttachmentReadTool` 按页、表格范围、行或关键词读取。附件内容是证据材料，不是指令。
+## 用户答复与内部执行
 
-检索从 `src/sources/` 的人工注册表及配置开始。`WebSearchTool` 使用注册表、搜索服务与相关性筛选发现候选页面；需要引用的页面再交给 `WebFetchTool` 抓取正文。可抓取 URL 限于用户提供、搜索工具返回、注册表登记或已抓取页面链接中的地址。网页与 PDF 正文也按不可信材料处理。当前还没有可重复检索的本地 SQLite FTS 正文索引或完整的结构化证据账本。
+`web/service.py` 完整消费 Agent 的所有帧后，才由 `agent/public_answer.py` 提取最后一个主 Agent 的最终正文。思考字段、工具调用及响应、专家输出不进入 HTTP 响应；只剩工具、专家或思考的未完成尾帧返回通用未完成提示，不把先前规划当成结论。嵌入式思考块也会过滤。CLI 复用同一边界。
 
-领域策略在 `src/config/*.yaml`，模型提示词在 `src/prompts/`，模板在 `src/templates/`。工具路径以 `src/` 为根目录。普通问题可直接回答；正式报告及其输出契约只在用户提出相应要求时使用。
+每条最终答复由程序统一追加 `config/xiaochi.yaml` 中的 AI 生成提示。前端按本轮 UUID 每秒查询固定阶段与耗时，显示“小弛正在检索官方政策……”等实际进度，收到最终答复后停止轮询、一次展示正文。`agent/progress.py` 隔离通知上下文，`web/progress.py` 的有界快照只含阶段、状态与耗时。服务端 Markdown 禁用原始 HTML，支持中文书名号附近加粗；客户端不拿内部消息进行 CSS 隐藏。
 
-## 状态与持久化
+计时展示文案为“已深度思考 xx 秒”，仍统计本轮处理耗时。有效提交时前端先保存草稿、立即清空输入框并复位高度；消息请求失败则恢复原文字、空白、换行和高度。消息已成功但历史刷新失败时不恢复草稿，避免误导用户重复发送。
 
-- `src/workspace/conversations/<id>.json`：WebUI 多轮对话记录，可从历史对话恢复。
-- `src/workspace/<run-id>/`：单轮运行日志、专家结果和 `capability_trace.jsonl`。
-- `src/workspace/attachments/<document-id>/`：上传文件和解析后的可定向回读内容。
-- `src/reports/`：按请求生成的正式报告文件。
+`web/static/style.css` 用主题变量统一政务蓝配色：深蓝主色、蓝灰正文、浅蓝背景/选中状态，红色用于少量强调及删除；`index.html` 的浏览器主题色与 `favicon.svg` 同步。桌面与手机布局复用同一配色。
 
-对话可以跨多轮运行；每轮运行有独立的工作目录。CLI 在当前进程中维护多轮上下文，WebUI 另有持久化记录。上述运行时目录不应视为法规来源的不可变快照库。
+`ConversationStore` 保存内部 `messages` 与独立 `public_messages`。API 使用白名单返回公开问题、答复及附件名称，历史标题也从公开内容计算。旧记录通过投影过滤工具、思考及内联附件正文；内部上下文保留供后续问题使用。API 和静态文件路由不挂载日志、workspace 或配置目录。
+
+历史删除将会话 JSON 原子移入 `.trash/`，活动历史和读取接口不再返回；撤销将原记录移回，内部上下文及附件保持可用。删除/恢复和 Agent 执行共用运行锁，生成中不接受历史管理；前端确认后删除，并提供撤销。删除当前对话清除当前 ID，删除其他记录保留当前答复及草稿。此功能不清除附件、解析缓存或运行日志。
+
+## 资料与证据
+
+上传文件以对话内的不透明 ID 引用，接口不接受服务器路径。附件解析器将可读取正文内联到内部上下文；较大的文件通过文档 ID、页码、工作表或行范围回读。旧轮附件 ID 会在本轮恢复注册。原文件和解析结果均不作为公开历史返回。附件内容和搜索摘录作为证据而非指令。
+
+`WebSearchTool` 使用来源注册表推断权威域名，默认中国内地；只接受结构化 `web_search_tool_result` 的 URL，模型生成正文不作搜索结果。`websearch/sources.py` 自动读取相关官方 HTML 正文，每批三个页面并行，失败换其他候选；成功结果在有界内存缓存 15 分钟。返回正文、最终 URL、时间、哈希和截断标记，网页请求不携带 API 密钥。正文与引用摘录分别计数；仅有链接仍为 `leads_only`，但不会强制结束 Agent。正文读取不等于现行有效性核验；版本、时点和适用对象仍由原 Agent 判断。没有远程 PDF、动态页面处理、本地正文索引或完整结构化证据账本。
+
+产品场景与话术在 `config/xiaochi.yaml`，领域策略在 `config/*.yaml`，提示词在 `prompts/`。`config/output-contract.yaml` 与 `templates/report.md` 只用于明确要求的税务报告或答复草稿，列出范围、结论、适用条件、政策依据及待确认事项，按需补充计算、案例或沿革。
+
+主 Agent 保留原来的 normal 模式、自主工具选择和按需专家委派。撤销新增的三次共享预算和 URL-only 强制终止；原有每 Agent 15 次搜索保护、重复查询检查与合法终止结果收尾保留。流程缩减依靠复用已取得的正文、不扩展无关问题、证据足够即停止；阶段通知不参与工具选择。
+
+## 持久化与并发
+
+- `workspace/conversations/<id>.json`：完整内部与公开会话，供历史恢复和继续提问。
+- `workspace/web_uploads/<conversation-id>/<upload-id>/`：原始上传文件与名称元数据。
+- `workspace/attachments/<document-id>/`：解析结果及回读索引。
+- `workspace/<run-id>/`：日志、专家结果与能力轨迹。
+- `reports/`：按请求生成的报告文件。
+
+当前是无账号体系的本地单用户应用。由于运行目录和附件会话仍是进程全局状态，`ChatService` 使用非阻塞互斥锁串行执行问题，忙时返回 409；不支持多个 workers。单轮失败不保存部分公开对话，客户端返回通用错误，详细异常只留在服务器。上述目录不代表法规不可变快照库。
+
+## 迭代评测
+
+`src/evals/xiaochi_smoke.py` 是显式运行的真实 DeepSeek 行为评测，不进入默认离线测试。八个真实场景通过实际 HTTP 接口验证最终输出、AI 提示、内部字段隔离、纯计算、多轮改写、关键事实澄清、附件、官方定位和一项政策原文回归，结果保存于 `workspace/eval/xiaochi-smoke.json`。已有 8/8 通过证据；一项政策回归不代表广泛税务政策质量或完整 42 题验收。

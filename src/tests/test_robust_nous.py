@@ -22,7 +22,7 @@ arguments": {"jurisdiction": "CN", "query": "税收公告"}}
 
 
 def test_repair_handles_newlines_trailing_commas_and_braces_inside_strings():
-    malformed = '''<tool_call>{name: 'WebFetchTool', arguments: {
+    malformed = '''<tool_call>{name: 'WebSearchTool', arguments: {
       url: 'https://example.com/a?x={value}', max_chars: 8000,
     }}</tool_call>'''
 
@@ -32,7 +32,7 @@ def test_repair_handles_newlines_trailing_commas_and_braces_inside_strings():
         [Message(ASSISTANT, [ContentItem(text=repaired)])]
     )
 
-    assert parsed[0].function_call.name == "WebFetchTool"
+    assert parsed[0].function_call.name == "WebSearchTool"
     assert json.loads(parsed[0].function_call.arguments) == {
         "url": "https://example.com/a?x={value}",
         "max_chars": 8000,

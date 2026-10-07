@@ -1,5 +1,5 @@
-"""Provider-independent web-search integration used by Qwen tools."""
+"""DeepSeek native web search and source discovery helpers."""
 
-from src.websearch.client import OpenWebSearchClient, OpenWebSearchError
+from src.websearch.deepseek import DeepSeekSearchClient, DeepSeekSearchError
 
-__all__ = ["OpenWebSearchClient", "OpenWebSearchError"]
+__all__ = ["DeepSeekSearchClient", "DeepSeekSearchError"]

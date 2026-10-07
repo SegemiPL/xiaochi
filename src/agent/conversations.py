@@ -1,4 +1,4 @@
-"""Durable storage for WebUI conversations.
+"""Durable private and public storage for Web conversations.
 
 Conversation history is intentionally separate from ``workspace/<run_id>``:
 run directories describe one agent execution, while a conversation can span
@@ -73,20 +73,25 @@ class ConversationStore:
         messages: Iterable[dict],
         *,
         create: bool = False,
+        public_messages: Iterable[dict] | None = None,
     ) -> dict:
         self._validate_id(conversation_id)
         plain_messages = _jsonable(list(messages))
         now = datetime.now(UTC).isoformat()
         with self._lock:
             existing = None if create else self._read(conversation_id)
+            display = (_jsonable(list(public_messages)) if public_messages is not None
+                       else (existing or {}).get("public_messages"))
             record = {
                 "version": SCHEMA_VERSION,
                 "id": conversation_id,
-                "title": conversation_title(plain_messages),
+                "title": conversation_title(display if display is not None else plain_messages),
                 "created_at": (existing or {}).get("created_at", now),
                 "updated_at": now,
                 "messages": plain_messages,
             }
+            if display is not None:
+                record["public_messages"] = display
             self.root.mkdir(parents=True, exist_ok=True)
             target = self.root / f"{conversation_id}.json"
             temporary = target.with_suffix(f".{uuid.uuid4().hex}.tmp")
@@ -103,6 +108,27 @@ class ConversationStore:
         if record is None:
             raise FileNotFoundError(f"Conversation not found: {conversation_id}")
         return record
+
+    def delete(self, conversation_id: str) -> None:
+        """Remove a history from active storage while retaining a recoverable record."""
+        self._validate_id(conversation_id)
+        with self._lock:
+            self.load(conversation_id)
+            trash = self.root / '.trash'
+            trash.mkdir(parents=True, exist_ok=True)
+            os.replace(self.root / f'{conversation_id}.json', trash / f'{conversation_id}.json')
+
+    def restore(self, conversation_id: str) -> None:
+        self._validate_id(conversation_id)
+        with self._lock:
+            source = self.root / '.trash' / f'{conversation_id}.json'
+            if not source.is_file():
+                raise FileNotFoundError('Deleted conversation not found')
+            target = self.root / f'{conversation_id}.json'
+            if target.exists():
+                raise ValueError('Conversation already exists')
+            self._validate_record(json.loads(source.read_text(encoding='utf-8')))
+            os.replace(source, target)
 
     def list(self) -> list[dict]:
         """Return valid conversations newest first, without message bodies."""
