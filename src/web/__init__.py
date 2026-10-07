@@ -1,0 +1,1 @@
+"""Independent Xiaochi Web application."""

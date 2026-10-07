@@ -14,11 +14,13 @@ from qwen_agent.llm import BaseChatModel
 from qwen_agent.llm.schema import ASSISTANT, USER, Message
 from qwen_agent.tools import BaseTool
 
+from src.agent.functional import FunctionalSubAgent
 from src.agent.results import (
     extract_last_assistant_text,
     resolve_structured_result,
     write_text_result,
 )
+from src.agent.tool_call_compat import ToolCallCompatibilityMixin
 from src.agent.tool_loop_guard import (
     TerminalToolResult,
     raise_for_terminal_tool_result,
@@ -26,8 +28,6 @@ from src.agent.tool_loop_guard import (
     terminal_finalize_prompt,
     tool_free_finalize_messages,
 )
-from src.agent.tool_call_compat import ToolCallCompatibilityMixin
-from src.agent.functional import FunctionalSubAgent
 from src.config.runtime import get_run_dir_relative, get_subagents_dir
 from src.prompts.prompts import *
 

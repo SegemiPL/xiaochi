@@ -12,12 +12,12 @@ from src.agent.main_agent import run_3wagent
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description = "3wagent")
+    parser = argparse.ArgumentParser(description = "小弛 · 税务工作辅助助手")
     parser.add_argument("-d", "--DEBUG", default=False, action="store_true", help="DEBUG Mode")
     parser.add_argument(
         "--cli",
         action="store_true",
-        help="start an interactive terminal session instead of the WebUI",
+        help="start an interactive terminal session instead of the Web app",
     )
     parser.add_argument(
         "-p", "--provider", help="LLM provider from the selected LLM config"
@@ -29,6 +29,8 @@ def parse_args():
         help="path to an alternative provider YAML (default: src/config/llm.yaml)",
     )
 
+    parser.add_argument("--host", default="127.0.0.1", help="Web server bind address")
+    parser.add_argument("--port", default=8000, type=int, help="Web server port")
     return parser.parse_args()
 
 def main():
@@ -40,14 +42,16 @@ def main():
 
     runner = run_3wagent
     if args.cli:
-        # Keep terminal-only use independent of Gradio imports.
+        # Keep terminal-only use independent of the Web server.
         from src.agent.cli import run_cli_3wagent
 
         runner = run_cli_3wagent
+    options = {} if args.cli else {"host": args.host, "port": args.port}
     runner(
         model_name=args.model,
         provider=args.provider,
         config_path=args.llm_config,
+        **options,
     )
 
 

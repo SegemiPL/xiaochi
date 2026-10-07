@@ -85,6 +85,9 @@ def test_qwen_search_tool_marks_and_prioritizes_official_results(monkeypatch):
 
     assert payload["status"] == "ok"
     assert payload["results"][0]["title"] == "Quarterly widget filing"
+    assert payload["quality"] == "leads_only"
+    assert payload["official_excerpt_results"] == 0
+    assert "NO source text" in payload["search_guidance"]
     assert payload["results"][0]["is_official"] is True
     assert "untrusted" in payload["untrusted_content_notice"].lower()
 
@@ -194,6 +197,14 @@ def test_terminal_search_result_stops_the_agent_tool_loop():
     assert caught.value.tool_name == "WebSearchTool"
 
 
+def test_official_links_without_text_do_not_force_premature_finalization():
+    from src.agent.tool_loop_guard import raise_for_terminal_tool_result
+
+    payload = {'status': 'ok', 'quality': 'leads_only', 'official_results': 1,
+               'results': [{'url': 'https://www.chinatax.gov.cn/example', 'snippet': ''}]}
+    raise_for_terminal_tool_result('WebSearchTool', json.dumps(payload))
+
+
 def test_main_agent_terminal_tool_result_forces_tool_free_finalization(monkeypatch):
     from qwen_agent.agents import FnCallAgent
     from qwen_agent.llm.schema import ASSISTANT, USER, FunctionCall, Message
@@ -281,10 +292,12 @@ def test_entrypoint_launches_selected_frontend_without_local_service(monkeypatch
     calls = []
     monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(
         DEBUG=False, cli=use_cli, model="test-model", provider="deepseek", llm_config=None,
+        host="127.0.0.1", port=8000,
     ))
     monkeypatch.setattr(main_module, "run_3wagent", lambda **kwargs: calls.append(("webui", kwargs)))
     monkeypatch.setattr(cli_module, "run_cli_3wagent", lambda **kwargs: calls.append(("cli", kwargs)))
     main_module.main()
     assert calls == [("cli" if use_cli else "webui", {
         "model_name": "test-model", "provider": "deepseek", "config_path": None,
+        **({} if use_cli else {"host": "127.0.0.1", "port": 8000}),
     })]
