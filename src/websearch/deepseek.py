@@ -10,12 +10,13 @@ and citation excerpts become discovery leads for the agent's evidence pipeline.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from src.agent.progress import progress_stage
+from src.config.env import get_env
 from src.config.websearch import DeepSeekSearchSettings
 from src.websearch.protocol import SearchResponse, SearchResult
 
@@ -79,7 +80,7 @@ class DeepSeekSearchClient:
             raise DeepSeekSearchError("invalid_arguments", "search query must not be empty")
         if not isinstance(limit, int) or limit < 1:
             raise DeepSeekSearchError("invalid_arguments", "search limit must be a positive integer")
-        api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        api_key = get_env("DEEPSEEK_API_KEY", "").strip()
         if not api_key:
             raise DeepSeekSearchError(
                 "missing_api_key", "Set DEEPSEEK_API_KEY to use DeepSeek native web search"
@@ -88,6 +89,7 @@ class DeepSeekSearchClient:
         body = {
             "model": self.settings.model,
             "max_tokens": self.settings.max_tokens,
+            "output_config": {"effort": self.settings.reasoning_effort},
             "messages": [{
                 "role": "user",
                 "content": [{"type": "text", "text": f"Perform a web search for the query: {query}"}],
@@ -115,7 +117,8 @@ class DeepSeekSearchClient:
             method="POST",
         )
         try:
-            status, raw = self._transport(request, self.settings.timeout_seconds)
+            with progress_stage('searching'):
+                status, raw = self._transport(request, self.settings.timeout_seconds)
         except (OSError, URLError, TimeoutError) as exc:
             # Do not echo transport exceptions: they can contain request headers.
             raise DeepSeekSearchError(

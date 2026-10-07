@@ -72,6 +72,7 @@ def test_request_matches_harness_protocol_and_reuses_rotated_chat_key(monkeypatc
     body = json.loads(request.data)
     assert body == {
         "model": "deepseek-v4-flash", "max_tokens": 4096,
+        "output_config": {"effort": "low"},
         "messages": [{"role": "user", "content": [{
             "type": "text", "text": "Perform a web search for the query: 税务测试规则",
         }]}],
@@ -180,6 +181,7 @@ def test_settings_ignore_chat_and_retired_daemon_configuration():
         "OPEN_WEBSEARCH_URL": "http://localhost:3210",
         "DEEPSEEK_SEARCH_BASE_URL": "https://search.example/anthropic/v1/",
         "DEEPSEEK_SEARCH_MODEL": "custom-search-model",
+        "DEEPSEEK_SEARCH_EFFORT": "HIGH",
         "DEEPSEEK_SEARCH_MAX_TOKENS": "999999",
         "DEEPSEEK_SEARCH_MAX_USES": "0",
         "DEEPSEEK_SEARCH_TIMEOUT_SECONDS": "bad",
@@ -187,6 +189,7 @@ def test_settings_ignore_chat_and_retired_daemon_configuration():
     })
     assert settings.base_url == "https://search.example/anthropic/v1"
     assert settings.model == "custom-search-model"
+    assert settings.reasoning_effort == "high"
     assert settings.max_tokens == 32768
     assert settings.max_uses == 1
     assert settings.timeout_seconds == 120

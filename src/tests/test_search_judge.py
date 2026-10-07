@@ -145,3 +145,14 @@ def test_validate_verdicts_rejects_malformed_entries():
         _validate_verdicts({"not": "a list"}, candidate_count=2)
     with pytest.raises(ValueError):
         _validate_verdicts([{"index": 99, "relevant": True}], candidate_count=2)
+
+
+def test_relevance_effort_does_not_change_main_model_config(monkeypatch):
+    from src.config.llm import get_active_llm_config, load_llm_config
+
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'synthetic-key')
+    original = load_llm_config(provider='deepseek')
+    judge = judge_module.SearchResultJudge()
+    assert judge.llm.generate_cfg['reasoning_effort'] == 'low'
+    assert get_active_llm_config() == original
+    assert 'reasoning_effort' not in original['generate_cfg']

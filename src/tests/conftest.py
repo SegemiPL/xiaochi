@@ -1,7 +1,6 @@
 """Shared test fixtures."""
 
 import pytest
-
 import src.config.llm as llm_config_module
 
 
@@ -17,3 +16,18 @@ def _reset_active_llm_config():
     llm_config_module._active_llm_config = None
     yield
     llm_config_module._active_llm_config = None
+
+
+@pytest.fixture(autouse=True)
+def _offline_official_sources(monkeypatch):
+    """Search mocks must never trigger an incidental live website request."""
+    from src.websearch.sources import _CACHE, OfficialSourceReader, SourceReadError
+
+    _CACHE.clear()
+
+    def unavailable(*args):
+        raise SourceReadError('offline_test')
+
+    monkeypatch.setattr(OfficialSourceReader, '_default_transport', staticmethod(unavailable))
+    yield
+    _CACHE.clear()
