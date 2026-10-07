@@ -1,8 +1,8 @@
 # LLM providers for the qwen-agent runtime.
 #
 # Keep API keys out of this file.  Providers with `api_key_env` read the key
-# from the process environment at startup.
-default_provider: local
+# from the process environment, including the ignored repository-root .env.
+default_provider: deepseek
 
 providers:
   deepseek:

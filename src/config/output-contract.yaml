@@ -1,47 +1,31 @@
-# Output contract — single source of truth for the required and supporting report sections.
-# All agents and skills must reference this file instead of duplicating section definitions.
-
+# 小弛正式报告契约；普通聊天不套用此结构。
 required_sections:
-  - id: classification
-    title: 问题分类
-    title_en: Problem Classification
-    priority: 1
-    description: Classification (funds-forex / funds-banking / tax / commercial / cross-domain), including securities-regulation where applicable, plus sub-domains and transaction type.
-
+  - id: issue_scope
+    title: 问题与范围
+    description: 说明工作事项、适用地区、政策截止时间及已确认的事实。未明确涉外时默认中国内地。
   - id: conclusions
-    title: 结论或考量维度
-    title_en: Conclusions or Dimensions
-    priority: 2
-    description: Directly quotable conclusions, or dimensions that must be considered if no direct conclusion is available.
-
-  - id: analogous_cases
-    title: 类案与公开答案
-    title_en: Analogous Cases and Public Answers
-    priority: 3
-    description: Analogous public judgments with case numbers, courts, key holdings and quoted excerpts. Other publicly retrievable answers.
-
-  - id: current_regulations
-    title: 涉及现行法规
-    title_en: Currently Effective Regulations
-    priority: 4
+    title: 结论与建议
+    description: 结论在前，区分已有依据、条件性判断和待核实事项；咨询答复标注为供审核的草稿。
+  - id: applicable_conditions
+    title: 适用条件与材料
+    description: 列出主体、业务、时间等适用条件和有依据的办税材料要求，不猜测地方受理口径。
+  - id: policy_basis
+    title: 政策依据
     is_priority: true
-    description: Complete numbered list of all currently effective laws, regulations and guidance, with jurisdiction, domain, issuing authority and current status.
-
-  - id: amendment_lineage
-    title: 法规修订关系
-    title_en: Amendment Lineage
-    priority: 5
-    description: For each currently effective regulation, the single-tier prior regulation it amended, replaced or repealed.
-
+    description: 提供实际取得的官方标题、文号、发布机关、日期、条款或摘录及原始链接，明确核验范围和有效性缺口。
+  - id: unresolved_facts
+    title: 待确认事项
+    description: 仅列影响结论的关键事实、材料缺口和人工复核事项。
 supporting_sections:
-  - id: risk_warnings
-    title: 风险提示
-    title_en: Risk Warnings
-
+  - id: calculation
+    title: 计算过程
+    description: 仅在涉及计算时列出有依据的税率、参数、公式、假设及结果。
+  - id: analogous_cases
+    title: 相关案例
+    description: 仅在问题涉及案例或用户要求时提供，明确案例不替代现行政策。
+  - id: amendment_lineage
+    title: 政策修订关系
+    description: 仅在历史沿革或版本比较任务中使用，修订关系须有官方证据。
   - id: reliability_assessment
-    title: 结论可靠性
-    title_en: Reliability Assessment
-
-  - id: report_files
-    title: 报告文件
-    title_en: Report Files
+    title: 依据与核验限制
+    description: 说明摘录、全文、日期或其他信息未能核实之处。

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
+
+from src.config.env import environment
 
 
 def _env_int(
@@ -38,10 +39,11 @@ class DeepSeekSearchSettings:
     max_uses: int = 5
     timeout_seconds: int = 120
     max_results: int = 10
+    reasoning_effort: str = "low"
 
     @classmethod
     def from_env(cls, environ: dict[str, str] | None = None) -> DeepSeekSearchSettings:
-        env = dict(os.environ if environ is None else environ)
+        env = environment() if environ is None else dict(environ)
         base_url = env.get("DEEPSEEK_SEARCH_BASE_URL", cls.base_url).strip().rstrip("/")
         parsed = urlparse(base_url)
         if (
@@ -56,8 +58,12 @@ class DeepSeekSearchSettings:
         model = env.get("DEEPSEEK_SEARCH_MODEL", cls.model).strip()
         if not model:
             raise ValueError("DEEPSEEK_SEARCH_MODEL must not be empty")
+        effort = env.get("DEEPSEEK_SEARCH_EFFORT", cls.reasoning_effort).strip().lower()
+        if effort not in {"low", "high", "max"}:
+            raise ValueError("DEEPSEEK_SEARCH_EFFORT must be low, high or max")
         return cls(
             base_url=base_url,
+            reasoning_effort=effort,
             max_results=_env_int(
                 env, "WEBSEARCH_MAX_RESULTS", cls.max_results, minimum=1, maximum=50
             ),
