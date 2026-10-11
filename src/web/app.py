@@ -37,7 +37,7 @@ def create_app(*, agent_factory=None, store=None, upload_root=None) -> FastAPI:
         def agent_factory():
             from src.agent.main_agent import MainAgent
             from src.config.llm import load_llm_config
-            return MainAgent(llm=load_llm_config())
+            return MainAgent(llm=load_llm_config(), suggest_followups=True)
 
     store = store or ConversationStore()
     upload_root = Path(upload_root or WORKSPACE_DIR / 'web_uploads')

@@ -6,7 +6,8 @@ Xiaochi is a government tax-work assistant built on the 3wagent core. It helps s
 
 ## Features
 
-- Independent chat interface with conversation history, new chats, uploads, policy links and answer copying.
+- Restrained blue-and-white workspace with conversation history, a central chat panel, and an official-resource sidebar on wide screens; uploads, policy links and answer copying remain available.
+- Three contextual follow-up questions after each answer. Clicking fills the editable composer; restored history retains the same questions.
 - PDF, DOCX, spreadsheet, CSV and text parsing, with up to five attachments per question and 25 MB per file.
 - Direct conclusions with relevant conditions and policy evidence. Initial clarification asks for at most three key facts. Reports and reply drafts are generated when requested.
 - Final answers only in Web and CLI. Reasoning, tool calls, tool responses and specialist messages stay on the backend; history restoration uses a separate public transcript.
@@ -103,9 +104,9 @@ src/.venv/bin/python -m src.evals.xiaochi_smoke
 
 This command consumes API usage and uses isolated temporary conversations. It writes a report to `src/workspace/eval/xiaochi-smoke.json` without keys, headers or full model configuration.
 
-| Validation | Result on 2026-10-07 |
+| Validation | Latest evidence |
 |---|---|
-| Offline regression | 199 tests passed |
+| Offline regression | 211 tests passed on 2026-10-08 |
 | Live model checks | 8/8 passed: identity, supplied-input calculation, follow-up rewriting, tax-input clarification, cross-border operation clarification, attachments, official-link discovery and document/date/scope verification for a recent-policy question |
 | Browser checks | Desktop and mobile layout, waiting indicator, final answers and history restoration checked; real calculation and Chinese bold rendering verified |
 
@@ -120,3 +121,5 @@ History entries support confirmed deletion and undo. Desktop controls appear on 
 This is a local single-user version, bound to `127.0.0.1` by default, without accounts or departmental permissions. Some core state remains process-global, so execution is serialized within one process. Multiple workers are not supported.
 
 Conversations, uploads, parsed documents and logs live in Git-ignored `src/workspace/`; requested report files live in `src/reports/`. Private context and public history are persisted separately. HTTP responses expose only public messages, and static routes do not expose workspace or model configuration.
+
+On 2026-10-08, two live cases (supplied-input calculation and synthetic material review) each produced three contextual follow-ups in the same model response. Metadata stays out of answer text, and history restores the same questions. This does not expand the tax-policy accuracy validation above.

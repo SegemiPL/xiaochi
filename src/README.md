@@ -111,7 +111,7 @@ SearXNG 工具、SAFE 站内搜索及 WebFetchTool 已删除，不再读取旧 d
 | CLI | `agent/cli.py`；保留内部多轮上下文，公开最终答复 |
 | 检索 | `websearch/` 与 `tools/web_search.py` |
 
-只读接口包括 `GET /api/config`、`GET /api/conversations`、`GET /api/conversations/{id}` 及本轮 UUID 的进度接口。写接口为新建、上传、消息、`DELETE /api/conversations/{id}` 与 `POST /api/conversations/{id}/restore`。删除和恢复仅返回 ID 与状态，不返回内部上下文。删除采用 `.trash/` 可恢复记录，附件和运行日志保留；同一运行锁保护消息与历史管理，正在处理问题时返回 409。消息接口完整结束后一次返回 `answer` 与 `answer_html`，不支持过程流。
+只读接口包括 `GET /api/config`、`GET /api/conversations`、`GET /api/conversations/{id}` 及本轮 UUID 的进度接口。写接口为新建、上传、消息、`DELETE /api/conversations/{id}` 与 `POST /api/conversations/{id}/restore`。删除和恢复仅返回 ID 与状态，不返回内部上下文。删除采用 `.trash/` 可恢复记录，附件和运行日志保留；同一运行锁保护消息与历史管理，正在处理问题时返回 409。消息接口完整结束后一次返回 `answer`、`answer_html` 与三个 `related_questions`，不支持过程流。
 
 ## 验证
 
@@ -122,7 +122,7 @@ uv sync --project src --extra dev
 src/.venv/bin/python -m pytest -q src/tests
 ```
 
-自动化测试包括多轮会话、历史投影、删除/撤销与运行互斥、附件隔离、最终答复提示、Markdown、进度与官方正文读取。199 项离线回归和八个真实场景通过，包含一项基于官方正文的政策回归；广泛税务政策质量及 42 题评测尚未完成。完整状态见能力路线图。
+自动化测试包括多轮会话、历史投影、删除/撤销与运行互斥、附件隔离、最终答复提示、Markdown、进度与官方正文读取。2026-10-08 的 211 项离线回归通过；此前八个真实场景通过，包含一项基于官方正文的政策回归；广泛税务政策质量及 42 题评测尚未完成。完整状态见能力路线图。
 
 可复现真实模型迭代：
 
@@ -133,3 +133,9 @@ src/.venv/bin/python -m src.evals.xiaochi_smoke
 该命令会调用 DeepSeek；使用独立临时会话，记录状态、答复、检查项、实际阶段和耗时到 `workspace/eval/xiaochi-smoke.json`，不记录密钥、请求头或完整模型配置，关闭后删除临时会话。检查覆盖身份、给定税率的纯算术、多轮改写、关键澄清、附件、官方链接定位及外籍个人分红公告的文件、文号、执行日期、适用对象、税率与旧条款废止。
 
 原生搜索可能只有结构化链接，没有 `citations[].cited_text`。程序不把生成摘要或不透明 `encrypted_content` 当政策原文；官方 HTML 阅读补齐正文链路。外籍个人分红用例取得官方正文，完整回答 55.24 秒、四次搜索工具调用；此前简短缺口答复不能作为成功提速基准。远程 PDF、动态页面及长文定向回读尚未实现。
+
+### 相关问题推荐
+
+Web 创建主 Agent 时启用 `suggest_followups`，本轮最终输出末尾生成三项 JSON 推荐元数据，无独立模型请求或额外检索。`agent/followups.py` 校验数量、类型、长度和去重；`agent/public_answer.py` 将元数据与正文分开，格式异常或截断时保留正常正文，并按问题类型提供三项兜底。`web/service.py` 将推荐保存在公开历史，旧历史在读取时补足推荐。CLI 默认不要求生成推荐。
+
+前端“相关问题”按钮把文字填入输入框，由用户修改、确认后发送；复制答复只包含正文和 AI 提示。2026-10-08 真实算术与虚拟材料两项验证通过，记录于本地忽略目录 `workspace/eval/office-followups-2026-10-08.json`。

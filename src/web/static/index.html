@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#164b87">
+  <meta name="theme-color" content="#265b91">
   <title>小弛 · 税务工作辅助助手</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
@@ -11,22 +11,23 @@
 <body>
   <div class="shell">
     <aside class="sidebar" id="sidebar">
-      <a class="brand" href="/" aria-label="小弛首页"><span class="brand-mark">弛</span><span>小弛<small>税务工作辅助助手</small></span></a>
-      <button class="new-chat" id="new-chat"><span>＋</span> 新建对话 <kbd>新</kbd></button>
+      <a class="brand" href="/" aria-label="小弛首页"><img class="brand-logo" src="/static/favicon.svg" width="42" height="42" alt=""><span class="brand-name">小弛<span class="brand-rule" aria-hidden="true"></span><small>税务工作辅助</small></span></a>
+      <button class="new-chat" id="new-chat"><span aria-hidden="true">＋</span> 新建对话</button>
       <div class="history-heading">历史对话 <span id="history-count">0</span></div>
-      <nav id="history" aria-label="历史对话"><p class="history-empty">从一个问题开始，<br>对话会自动保存在这里。</p></nav>
-      <div class="sidebar-bottom"><span class="status-dot"></span> 专注税务，辅助工作 <span class="version">小弛</span></div>
+      <nav id="history" aria-label="历史对话"><p class="history-empty">暂无历史对话</p></nav>
+      <div class="sidebar-bottom">对话记录保存在本机</div>
     </aside>
     <div class="scrim" id="scrim"></div>
     <main>
       <button class="menu-button" id="menu-button" aria-label="打开历史对话" aria-controls="sidebar" aria-expanded="false">☰</button>
-      <section class="workspace">
+      <section class="workspace" aria-label="税务咨询工作区">
         <div class="welcome" id="welcome">
-          <div class="welcome-eyebrow"><span></span> 让政策更清晰，让工作更从容</div>
-          <h1>您好，我是<span>小弛</span></h1>
-          <p class="intro">您可以向我咨询税收政策、解读办税材料，<br class="desktop-break">或一起梳理思路，草拟一份工作答复。</p>
+          <div class="welcome-kicker">业务工作台</div>
+          <h1>税务政策与业务辅助</h1>
+          <p class="intro">政策查询、材料解读、答复草拟与税费核算。</p>
+          <h2 class="section-label">选择需要处理的事项</h2>
           <div class="suggestions" id="suggestions"></div>
-          <div class="welcome-note"><span>◎</span> 提供适用地区、时间和具体情形，有助于获得更准确的答复。</div>
+          <p class="welcome-note">提问时请说明适用地区、所属期和具体情形；可附相关材料。</p>
         </div>
         <div class="messages" id="messages" aria-live="polite" aria-label="对话内容"></div>
         <div class="composer-area">
@@ -34,20 +35,44 @@
           <div class="history-notice" id="history-notice" role="status" hidden>
             <span>已删除对话</span><button type="button" id="undo-delete">撤销</button>
           </div>
+          <div class="composer-heading"><span>提出问题</span><span>可附相关材料</span></div>
           <form class="composer" id="chat-form">
             <div class="attachment-list" id="attachments"></div>
             <label class="sr-only" for="question">请输入您的税务问题</label>
-            <textarea id="question" rows="2" placeholder="请输入您的问题，也可以上传文件让我帮您解读…" maxlength="20000"></textarea>
+            <textarea id="question" rows="2" placeholder="请输入需要查询或处理的事项…" maxlength="20000"></textarea>
             <div class="composer-toolbar">
               <button class="attach-button" type="button" id="attach-button" aria-label="上传附件"><span>＋</span> 上传材料</button>
               <input type="file" id="file-input" accept=".pdf,.docx,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.markdown,.yaml,.yml" multiple hidden>
               <span class="input-hint">Enter 发送 · Shift + Enter 换行</span>
-              <button class="send-button" id="send-button" type="submit" aria-label="发送问题">↑</button>
+              <button class="send-button" id="send-button" type="submit" aria-label="发送问题">发送</button>
             </div>
           </form>
           <p class="footer-note" id="footer-note">以上内容由 AI 生成，仅供参考，具体请以现行有效政策及主管税务机关确认口径为准。</p>
         </div>
       </section>
+      <aside class="resource-rail" aria-label="政策资料与提问参考">
+        <section class="resource-card">
+          <h2>政策资料<span>官方入口</span></h2>
+          <nav class="resource-links" aria-label="官方政策网站">
+            <a href="https://www.chinatax.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img class="ministry-logo" src="/static/icons/tax-header.png" width="30" height="32" alt=""></span><span>国家税务总局<small>税收政策与纳税服务</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
+            <a href="https://www.mof.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img class="ministry-logo" src="/static/icons/mof-header.png" width="30" height="32" alt=""></span><span>财政部<small>财政政策与公告</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
+            <a href="https://fgk.chinatax.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img src="/static/icons/policy-library.svg" width="28" height="28" alt=""></span><span>税收政策法规库<small>文件检索与政策解读</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
+          </nav>
+        </section>
+        <section class="resource-card example-card">
+          <h2>提问示例</h2>
+          <div class="example-questions">
+            <button type="button" data-question="请帮我查询一项税收优惠政策，说明需要提供哪些主体、地区和所属期信息。"><span aria-hidden="true">01</span>查询税收优惠的适用条件</button>
+            <button type="button" data-question="请帮我将一份办税材料整理成核对清单，我会上传材料。"><span aria-hidden="true">02</span>整理办税材料核对清单</button>
+            <button type="button" data-question="请协助起草一份纳税咨询答复，先说明需要提供哪些具体事实。"><span aria-hidden="true">03</span>起草一份纳税咨询答复</button>
+          </div>
+        </section>
+        <section class="usage-note">
+          <h2>材料与说明</h2>
+          <p>支持 PDF、Word、Excel 及文本材料，每次最多 5 份，单份不超过 25 MB。</p>
+          <p>请注明适用地区和所属期，政策结论及工作草稿使用前应复核。</p>
+        </section>
+      </aside>
     </main>
   </div>
   <dialog id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-description">
