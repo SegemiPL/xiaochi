@@ -12,8 +12,14 @@ from qwen_agent.llm.schema import ContentItem, Message
 
 from src.agent.attachments import inline_uploaded_files
 from src.agent.conversations import ConversationStore, conversation_title
+from src.agent.followups import fallback_questions, normalize_questions
 from src.agent.progress import progress_sink, report_progress
-from src.agent.public_answer import completed_answer, legacy_public_history, public_text
+from src.agent.public_answer import (
+    completed_answer,
+    completed_questions,
+    legacy_public_history,
+    public_text,
+)
 from src.attachments.storage import register_session_document, reset_session_documents
 from src.config.product import AGENT_NAME
 from src.web.progress import ProgressTracker
@@ -40,6 +46,7 @@ class ChatService:
             display = legacy_public_history(record['messages'])
         # Explicit allowlist; never send the raw store record to an API response.
         messages = []
+        question = ''
         for item in display:
             role = item.get('role')
             if role not in {'user', 'assistant'}:
@@ -47,10 +54,14 @@ class ChatService:
             text = str(item.get('content') or '')
             if role == 'assistant':
                 text = public_text(text)
+            else:
+                question = text
             messages.append({
                 'role': role, 'content': text,
                 'attachments': [str(name) for name in item.get('attachments', [])]
                 if role == 'user' else [],
+                **({'related_questions': normalize_questions(item.get('related_questions'))
+                    or fallback_questions(question, text)} if role == 'assistant' else {}),
             })
         return {**{key: record[key] for key in ('id', 'title', 'created_at', 'updated_at')},
                 'title': conversation_title(messages), 'messages': messages}
@@ -129,11 +140,12 @@ class ChatService:
             for frame in agent.run(history):
                 final_frame = frame
             answer = completed_answer(final_frame, getattr(agent, "name", AGENT_NAME))
+        questions = completed_questions(final_frame, text)
         report_progress('writing')
         history.extend(final_frame)
         public += [
             {'role': 'user', 'content': text, 'attachments': [item['name'] for item in files]},
-            {'role': 'assistant', 'content': answer},
+            {'role': 'assistant', 'content': answer, 'related_questions': questions},
         ]
         self.store.save(conversation_id, history, public_messages=public)
-        return {'conversation_id': conversation_id, 'answer': answer}
+        return {'conversation_id': conversation_id, 'answer': answer, 'related_questions': questions}

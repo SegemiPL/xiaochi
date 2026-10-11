@@ -57,10 +57,11 @@
 
 | 编号 | 能力 | 状态 | 最后更新 | 实现证据与验收边界 |
 |---|---|---|---|---|
-| XIAOCHI-01 | 独立税务聊天前端 | ✅ 已完成 | 2026-10-07 | `src/web/static/`、`src/web/app.py`：政务蓝主题、历史、新建、删除确认/撤销、附件、政策链接、复制；移除顶部工作台栏，手机保留独立历史入口；历史标题左侧不再显示圆圈；提交后立即清空输入框，失败恢复草稿；删除当前对话回到新对话，删除其他记录保留答复与草稿；CSS 统一深浅蓝与红色强调，浏览器主题色/favicon 同步；接口与桌面/手机浏览器检查通过 |
+| XIAOCHI-01 | 独立税务聊天前端 | ✅ 已完成 | 2026-10-08 | `src/web/static/`：依据用户汇小二截图调整为蓝白分区、细边框、小圆角和轻微阴影；左侧历史、中间咨询卡片、宽屏右侧官方政策入口/提问示例，窄屏保留主对话；补齐小弛品牌、官方入口标识与政策书册图标，本地资源及来源见 `src/web/static/icons/`，桌面/手机预览 `xiaochi-logos.jpg`、`xiaochi-logos-mobile.jpg`。每轮三个相关问题、历史/删除撤销、附件、复制与草稿行为保留；1280px桌面、1024px平板、390px手机检查无横向溢出，示例/推荐填入和历史切换正常；截图 `src/workspace/preview/xiaochi-refined-home.jpg`、`xiaochi-refined-answer.jpg`、`xiaochi-refined-mobile.jpg` |
 | XIAOCHI-02 | 税务部门角色、业务配置与报告模板 | 🟡 部分实现 | 2026-10-07 | `src/config/xiaochi.yaml`、`src/prompts/prompts.py` 与报告契约/模板；默认中国内地、结论在前、缺少条件先澄清。正确性与完整性优先，政策答案长度服从所需条件，不为提速强制拒答。`src/evals/xiaochi_smoke.py` 八个真实场景通过，含外籍个人分红正式文件、文号、执行日期、适用范围、税率和旧条款废止核验；一项政策回归不足以完成全面税务质量验收，参考站未成功加载 |
-| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-07 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复 |
+| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-08 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复；`followups.py` 与 `test_followups.py` 验证推荐元数据不进入正文，非法/截断区块不暴露，思考/工具/专家不能提供推荐 |
 | XIAOCHI-04 | 本地 .env 加载与密钥隔离 | ✅ 已完成 | 2026-10-07 | `src/config/env.py` 固定仓库路径加载私有 `.env`、环境变量优先；聊天和搜索共享加载；`.gitignore` 覆盖且本机文件为 0600；`src/tests/test_env.py` 验证路径、优先级、共享凭据及缺失文件；真实调用验证成功，代码、报告及运行日志扫描未发现密钥值 |
+| XIAOCHI-05 | 每轮三个相关问题 | ✅ 已完成 | 2026-10-08 | `src/agent/followups.py`、`public_answer.py`、`src/web/service.py`、`static/app.js`：同轮生成、严格校验、按场景兜底、公开历史持久化；不增加独立模型请求或工具流程。`src/tests/test_followups.py` 与 `test_xiaochi_web.py` 覆盖异常元数据、内部信息隔离、新答复/恢复/删除撤销；真实计算和虚拟材料两项均返回模型生成的三个问题，点击填入及刷新一致。广泛推荐质量仍需后续样本迭代 |
 
 这里的完成状态仅针对所述界面与输出边界；当前是串行执行的本地单用户应用，账号、部门权限与多人部署不在本轮验收范围。
 
@@ -440,3 +441,25 @@
 
 - 汇总现有重构为共享环境/税务配置、官方正文检索、独立聊天与历史管理、文档/评测四个提交；此前的原生搜索迁移提交一并保留。相关能力状态不因发布而升级。
 - 验证：完整离线回归再次 199 项通过；前端 JavaScript 语法、diff 检查及新增/改动核心模块的定向 Ruff 检查通过。`config/llm.py` 只检查并修正导入格式，既有旧类型注解和异常类型规则未扩展处理；正文解析器补齐 ClassVar 与正则标志写法。`.env`、workspace 未跟踪且被忽略，候选提交文件未发现真实密钥或私钥。架构说明将评测场景数同步为实际八项；真实模型报告沿用本轮此前已取得的结果，发布检查未重复消耗模型 API。
+
+### 2026-10-08：简朴政务界面与相关问题
+
+- `XIAOCHI-01`、`XIAOCHI-03`、`XIAOCHI-05`：重写前端样式与首页文案，白灰为底、深蓝为操作色，去除装饰头像、宣传语、渐变、阴影、大圆角，保留明确的“发送”文字按钮和既有交互。汇小二参考页本轮未能加载，按用户指定的严肃、低调、简朴方向实现。
+- Web 主 Agent 仅增加最终输出的推荐协议，研究循环不变。三个推荐与本轮答案一起生成，提取为独立字段；格式异常、截断或旧历史按类型补足。推荐按钮填入输入框，不自动发送，复制答复不包含推荐。README、运行指南和架构同步。
+- 验证：211 项离线回归通过；相关 Ruff、JavaScript 语法和 diff 检查通过。真实 DeepSeek 算术与虚拟材料两项均取得模型生成的三个推荐，保存于 `src/workspace/eval/office-followups-2026-10-08.json`；浏览器验证三项显示、点击填入、刷新一致、历史恢复，桌面与390×844手机无横向溢出，菜单不覆盖正文。截图 `src/workspace/preview/xiaochi-office-home.jpg`、`xiaochi-office-answer.jpg`、`xiaochi-office-mobile.jpg`。本轮仅验证呈现和推荐，未重新验收广泛税务政策质量。
+
+### 2026-10-08：依据汇小二截图细化蓝白界面
+
+- `XIAOCHI-01`：根据用户提供的参考截图重排蓝白内容分区，保留历史侧栏及无顶部通栏布局；白色欢迎/答复卡片配细边框、小圆角和轻微阴影，输入框、发送按钮与三个推荐问题统一样式。新增官方政策资料外链和三条可填入草稿的提问示例；不添加登录、语音或其他未实现入口，不改变模型回答流程。
+- `src/web/static/index.html`、`style.css`、`app.js`、`favicon.svg` 为实现文件；国家税务总局、财政部和税收政策法规库入口已按官方页面核对。README 与架构同步。状态保持已完成。
+- 验证：桌面1280×720、平板1024×768、手机390×844浏览器检查无横向溢出；欢迎卡片和输入区不重叠，窄屏隐藏右侧栏，菜单与正文分离；历史答复及三个相关问题可恢复，提问示例/推荐点击填入正确草稿。`node --check`、`git diff --check` 通过。截图 `src/workspace/preview/xiaochi-refined-home.jpg`、`xiaochi-refined-answer.jpg`、`xiaochi-refined-mobile.jpg`。本轮为界面修改，不重复模型政策评测。
+
+### 2026-10-08：补齐品牌与政策入口图标
+
+- `XIAOCHI-01` 状态保持已完成，最后更新为2026-10-08。`src/web/static/index.html`、`style.css` 复用小弛 favicon 作为侧栏品牌标识；国家税务总局与财政部入口使用各自官网原始页头资源中的国徽，政策法规库使用自绘书册功能图标。资源保存在 `src/web/static/icons/`，同目录 README 记录来源与用途；不依赖远程热链，不修改 Agent 流程。
+- 验证：浏览器确认四个图标全部加载、官方入口名称与链接保留；1280×720 桌面与390×844手机侧栏无横向溢出，品牌名称不挤压，菜单展开/收起正常。截图 `src/workspace/preview/xiaochi-logos.jpg`、`xiaochi-logos-mobile.jpg`；`git diff --check` 通过。本轮仅静态界面修改，未重复模型评测。
+
+### 2026-10-11：界面与相关问题发布检查
+
+- 汇总蓝白政务界面、官方入口图标及每轮三个相关问题推荐，已有能力状态不因发布升级；沿用2026-10-08桌面/手机浏览器和真实推荐验证证据。
+- 发布前完整离线回归211项通过；核心改动定向 Ruff、前端 JavaScript 语法、`git diff --check` 通过。确认 `.env` 与 workspace 被忽略且未跟踪；不重复调用模型或扩大政策准确性结论。

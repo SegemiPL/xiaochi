@@ -4,12 +4,6 @@ const state = {id: null, messages: [], attachments: [], busy: false};
 let agentName = '小弛';
 let pendingDelete = null;
 let lastDeleted = null;
-const icons = [
-  '<path d="M5 3h11l3 3v15H5zM16 3v4h4M9 11h6M9 15h6"/>',
-  '<path d="M4 5h7c2 0 3 1 3 3v13c0-2-1-3-3-3H4zM14 8c0-2 1-3 3-3h3v13h-3c-2 0-3 1-3 3"/>',
-  '<path d="M4 20h5L20 9l-5-5L4 15zM12 7l5 5M4 15l5 5"/>',
-  '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M14 11h2M8 15h2M14 15h2M8 18h2M14 18h2"/>',
-];
 async function api(path, options = {}) {
   const response = await fetch(path, options);
   const data = await response.json();
@@ -21,7 +15,7 @@ function setBusy(value) {
   state.busy = value;
   for (const button of document.querySelectorAll('button')) button.disabled = value;
   $('question').readOnly = value;
-  $('send-button').textContent = value ? '·' : '↑';
+  $('send-button').textContent = value ? '处理中' : '发送';
 }
 function scrollEnd() {
   const workspace = document.querySelector('.workspace');
@@ -30,8 +24,9 @@ function scrollEnd() {
 function closeMenu() { $('sidebar').classList.remove('open'); $('scrim').classList.remove('open'); $('menu-button').setAttribute('aria-expanded', 'false'); }
 function assistantLabel() {
   const label = document.createElement('div'); label.className = 'assistant-label';
-  const mark = document.createElement('span'); mark.className = 'mini-mark'; mark.textContent = '弛';
-  label.append(mark, document.createTextNode(agentName)); return label;
+  const name = document.createElement('span'); name.textContent = agentName;
+  const note = document.createElement('span'); note.className = 'answer-caption'; note.textContent = '参考答复';
+  label.append(name, note); return label;
 }
 function renderMessages(waiting = false) {
   $('messages').replaceChildren();
@@ -51,6 +46,16 @@ function renderMessages(waiting = false) {
       const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'copy-button'; copy.textContent = '复制答复';
       copy.addEventListener('click', async () => {try {await navigator.clipboard.writeText(item.content); copy.textContent = '已复制';} catch (_) {showError('浏览器未允许复制，请选择答复文字手动复制。');}});
       message.append(copy);
+      if (Array.isArray(item.related_questions) && item.related_questions.length === 3) {
+        const related = document.createElement('section'); related.className = 'related-questions'; related.setAttribute('aria-label', '相关问题');
+        const heading = document.createElement('h3'); heading.textContent = '相关问题';
+        const hint = document.createElement('span'); hint.textContent = '点击填入提问框'; heading.append(hint); related.append(heading);
+        for (const question of item.related_questions) {
+          const button = document.createElement('button'); button.type = 'button'; button.disabled = state.busy;
+          button.textContent = question; button.addEventListener('click', () => useQuestion(question)); related.append(button);
+        }
+        message.append(related);
+      }
     }
     $('messages').append(message);
   }
@@ -96,7 +101,7 @@ async function refreshHistory() {
   const {conversations} = await api('/api/conversations');
   $('history-count').textContent = conversations.length;
   $('history').replaceChildren();
-  if (!conversations.length) {const note = document.createElement('p'); note.className = 'history-empty'; note.textContent = '从一个问题开始，对话会自动保存在这里。'; $('history').append(note);}
+  if (!conversations.length) {const note = document.createElement('p'); note.className = 'history-empty'; note.textContent = '暂无历史对话'; $('history').append(note);}
   for (const item of conversations) {
     const row = document.createElement('div'); row.className = `history-row${item.id === state.id ? ' active' : ''}`;
     const button = document.createElement('button'); button.className = `history-item${item.id === state.id ? ' active' : ''}`; button.title = item.title; button.disabled = state.busy;
@@ -192,7 +197,7 @@ $('chat-form').addEventListener('submit', async event => {
     stopProgress = watchProgress(state.id, requestId);
     const response = await api(`/api/conversations/${state.id}/messages`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:text, attachments:files.map(item => item.id), request_id:requestId})});
     committed = true;
-    state.messages.push({role:'assistant', content:response.answer, html:response.answer_html});
+    state.messages.push({role:'assistant', content:response.answer, html:response.answer_html, related_questions:response.related_questions});
     state.attachments = []; renderAttachments(); renderMessages();
     await refreshHistory();
   } catch (error) {
@@ -201,16 +206,24 @@ $('chat-form').addEventListener('submit', async event => {
   }
   finally {stopProgress(); setBusy(false); $('question').focus();}
 });
+function useQuestion(text) {
+  if (state.busy) return;
+  $('question').value = text;
+  $('question').dispatchEvent(new Event('input'));
+  $('question').focus();
+}
+for (const button of document.querySelectorAll('[data-question]')) {
+  button.addEventListener('click', () => useQuestion(button.dataset.question));
+}
 async function initialize() {
   try {
     const config = await api('/api/config'); agentName = config.name; $('footer-note').textContent = config.disclaimer;
-    config.quick_questions.forEach((item, index) => {
+    config.quick_questions.forEach(item => {
       const button = document.createElement('button'); button.className = 'suggestion'; button.type = 'button';
-      const icon = document.createElement('span'); icon.className = 'suggestion-icon'; icon.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[index % icons.length]}</svg>`;
       const copy = document.createElement('span'); copy.className = 'suggestion-copy';
       const title = document.createElement('strong'); title.textContent = item.title; const caption = document.createElement('small'); caption.textContent = item.caption; copy.append(title, caption);
-      const arrow = document.createElement('span'); arrow.className = 'suggestion-arrow'; arrow.textContent = '↗'; button.append(icon, copy, arrow);
-      button.addEventListener('click', () => {if (state.busy) return; $('question').value = item.text; $('question').focus();}); $('suggestions').append(button);
+      button.append(copy);
+      button.addEventListener('click', () => useQuestion(item.text)); $('suggestions').append(button);
     });
     await refreshHistory();
     const remembered = localStorage.getItem('xiaochi-conversation'); if (remembered) await selectConversation(remembered);

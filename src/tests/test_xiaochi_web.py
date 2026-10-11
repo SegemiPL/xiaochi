@@ -308,3 +308,42 @@ def test_history_mutation_errors_and_cross_origin_requests_leave_records_intact(
     assert client.delete(url).status_code == 200
     assert client.delete(url).status_code == 404
     assert client.post(url + '/restore').status_code == 200
+
+
+def test_related_questions_returned_persisted_and_restored_without_private_metadata(web):
+    import json
+    client, conversation, store = web
+    questions = ['适用这项政策还需要确认哪些事实？', '如何核对上述文件的执行日期？', '能否将已核实的依据整理成表格？']
+
+    class RelatedAgent(NoisyAgent):
+        def run(self, history):
+            yield [Message(ASSISTANT, 'PRIVATE_PLAN', name=self.name)]
+            yield [Message(ASSISTANT, '公开答复。\n<!-- xiaochi-related-questions\n'
+                + json.dumps(questions, ensure_ascii=False) + '\n-->', name=self.name)]
+
+    client.app.state.chat_service.agent_factory = RelatedAgent
+    result = client.post(f'/api/conversations/{conversation}/messages', json={'message': '查询政策'}).json()
+    assert result['related_questions'] == questions
+    assert 'xiaochi-related' not in result['answer'] + result['answer_html']
+    assert 'PRIVATE' not in str(result)
+    assert store.load(conversation)['public_messages'][-1]['related_questions'] == questions
+    restored = client.get(f'/api/conversations/{conversation}').json()['messages'][-1]
+    assert restored['related_questions'] == questions
+    assert 'xiaochi-related' not in restored['html']
+    # Deleting and undoing also retain the exact follow-ups.
+    client.delete(f'/api/conversations/{conversation}')
+    client.post(f'/api/conversations/{conversation}/restore')
+    assert client.get(f'/api/conversations/{conversation}').json()['messages'][-1]['related_questions'] == questions
+
+
+def test_missing_and_legacy_questions_get_three_contextual_fallbacks(web):
+    client, conversation, store = web
+    result = client.post(f'/api/conversations/{conversation}/messages', json={'message': '计算税额'}).json()
+    assert len(result['related_questions']) == 3
+    assert '参数' in result['related_questions'][0]
+    restored = client.get(f'/api/conversations/{conversation}').json()['messages'][-1]
+    assert restored['related_questions'] == result['related_questions']
+    old = store.create([{'role': 'user', 'content': '请草拟答复'},
+                        {'role': 'assistant', 'content': '公开草稿'}])
+    questions = client.get(f'/api/conversations/{old}').json()['messages'][-1]['related_questions']
+    assert len(questions) == 3 and '草稿' in ''.join(questions)

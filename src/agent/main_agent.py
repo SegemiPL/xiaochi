@@ -12,6 +12,7 @@ from qwen_agent.llm import BaseChatModel
 from qwen_agent.llm.schema import USER, Message
 
 from src.agent.attachments import inline_uploaded_files, supported_formats_hint
+from src.agent.followups import RELATED_QUESTIONS_PROMPT
 from src.agent.progress import progress_stage, report_progress
 from src.agent.subagent import (
     CitationVerifierSubAgent,
@@ -56,6 +57,8 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
     def __init__(
         self,
         llm: dict | BaseChatModel | None = None,
+        *,
+        suggest_followups: bool = False,
     ):
         subagent_tools = ['MarkDownReadTool', 'YamlReadTool', 'AttachmentReadTool']
         retrieval_tools = subagent_tools + ['WebSearchTool']
@@ -88,7 +91,8 @@ class MainAgent(ToolCallCompatibilityMixin, FnCallAgent):
             function_list=tools,
             system_message=(MAIN_AGENT_SYS_PROMPT + '\n当前日期（北京时间）：'
                             + datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
-                            + '。相对日期按此日期理解；用户指定的政策所属期另行遵守。'),
+                            + '。相对日期按此日期理解；用户指定的政策所属期另行遵守。'
+                            + (RELATED_QUESTIONS_PROMPT if suggest_followups else '')),
             name=AGENT_NAME,
             description=PRODUCT['tagline'],
         )
@@ -232,7 +236,7 @@ def run_3wagent(model_name=None, provider=None, config_path=None, host='127.0.0.
     from src.web.app import create_app
 
     def build_agent():
-        return MainAgent(llm=load_llm_config(
+        return MainAgent(suggest_followups=True, llm=load_llm_config(
             model_name=model_name, provider=provider, config_path=config_path,
         ))
 
