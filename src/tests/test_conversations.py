@@ -46,3 +46,29 @@ def test_store_serializes_model_dump_values(tmp_path):
     conversation_id = store.create([ModelLike()])
     payload = json.loads((tmp_path / f"{conversation_id}.json").read_text(encoding="utf-8"))
     assert payload["messages"] == [{"role": "assistant", "content": "done"}]
+
+
+def test_deleted_history_stays_hidden_after_restart_and_restore_preserves_both_histories(tmp_path):
+    store = ConversationStore(tmp_path)
+    deleted = store.create([{'role': 'assistant', 'content': 'PRIVATE_TOOL_CONTEXT'}])
+    record = store.save(deleted, [{'role': 'assistant', 'content': 'PRIVATE_TOOL_CONTEXT'}],
+                        public_messages=[{'role': 'assistant', 'content': '公开结论'}])
+    other = store.create([{'role': 'user', 'content': '另一个对话'}])
+    other_bytes = (tmp_path / f'{other}.json').read_bytes()
+    store.delete(deleted)
+    restarted = ConversationStore(tmp_path)
+    assert [item['id'] for item in restarted.list()] == [other]
+    with pytest.raises(FileNotFoundError):
+        restarted.load(deleted)
+    restarted.restore(deleted)
+    assert restarted.load(deleted) == record
+    assert (tmp_path / f'{other}.json').read_bytes() == other_bytes
+
+
+def test_history_mutations_reject_invalid_ids_and_missing_records(tmp_path):
+    store = ConversationStore(tmp_path)
+    for operation in (store.delete, store.restore):
+        with pytest.raises(ValueError):
+            operation('../outside')
+        with pytest.raises(FileNotFoundError):
+            operation('a' * 32)

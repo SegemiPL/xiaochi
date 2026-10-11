@@ -20,6 +20,7 @@ from typing import Any
 from qwen_agent.llm.schema import ASSISTANT, USER, Message
 
 from src.agent.functional import FunctionalSubAgent
+from src.agent.progress import progress_stage
 from src.agent.tool_loop_guard import _message_has_text, drop_unresolved_tool_calls
 from src.config.llm import get_active_llm_config
 from src.config.runtime import get_run_dir
@@ -40,6 +41,12 @@ class SearchResultJudge(FunctionalSubAgent):
         llm = get_active_llm_config()
         if llm is None:
             raise JudgeUnavailable("no active LLM config; judge is disabled")
+        # Relevance classification needs less reasoning than tax analysis.
+        # Only tune the official DeepSeek route; leave other providers intact.
+        if str(llm.get('model_server', '')).rstrip('/') in {
+            'https://api.deepseek.com', 'https://api.deepseek.com/v1',
+        }:
+            llm.setdefault('generate_cfg', {})['reasoning_effort'] = 'low'
         super().__init__(llm=llm, function_list=[], **kwargs)
 
     def judge(
@@ -61,7 +68,8 @@ class SearchResultJudge(FunctionalSubAgent):
             )
         )
         output_path = get_run_dir() / 'search_judges' / f'{uuid.uuid4().hex}.json'
-        verdicts = self.run_with_messages(history, output_path)
+        with progress_stage('reviewing'):
+            verdicts = self.run_with_messages(history, output_path)
         return _validate_verdicts(verdicts, len(candidates))
 
 

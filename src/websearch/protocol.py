@@ -1,4 +1,4 @@
-"""Stable internal response types for web search and content retrieval."""
+"""Stable internal response types for DeepSeek web search."""
 
 from __future__ import annotations
 
@@ -13,9 +13,13 @@ class SearchResult:
     snippet: str
     engine: str
     source: str
+    published_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        if self.published_at is None:
+            result.pop("published_at")
+        return result
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,7 @@ class SearchResponse:
     engines: list[str]
     results: list[SearchResult]
     partial_failures: list[dict[str, Any]] = field(default_factory=list)
+    truncated: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -32,19 +37,5 @@ class SearchResponse:
             "total_results": len(self.results),
             "results": [item.to_dict() for item in self.results],
             "partial_failures": self.partial_failures,
+            "truncated": self.truncated,
         }
-
-
-@dataclass(frozen=True)
-class FetchResponse:
-    url: str
-    final_url: str
-    title: str
-    content_type: str
-    retrieval_method: str
-    truncated: bool
-    content: str
-    links: list[dict[str, str]] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)

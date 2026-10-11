@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -10,73 +9,7 @@ from urllib.parse import urlparse
 import yaml
 
 from src.tools.common import PROJECT_ROOT
-from src.websearch.relevance import normalize_search_text, relevance_score, strip_site_operators
-
-
-@dataclass(frozen=True)
-class RegistryMatch:
-    source_id: str
-    title: str
-    url: str
-    authority: str
-    reliability: str
-    source_type: str
-    score: float
-
-    def to_search_dict(self) -> dict[str, Any]:
-        return {
-            "title": self.title,
-            "url": self.url,
-            "snippet": f"{self.authority}; {self.source_type}; reliability {self.reliability}",
-            "engine": "source_registry",
-            "source": self.source_id,
-            "relevance_score": self.score,
-        }
-
-
-def load_registry_matches(
-    query: str,
-    jurisdiction: str | None,
-    *,
-    minimum_score: float = 0.46,
-    limit: int = 5,
-    registry_path: Path | None = None,
-) -> list[RegistryMatch]:
-    if len(normalize_search_text(strip_site_operators(query))) < 3:
-        return []
-    matches: list[RegistryMatch] = []
-    for entry in _load_registry_entries(jurisdiction, registry_path=registry_path):
-        title = str(entry.get("title") or "")
-        url = str(entry.get("url") or "")
-        if not title or not url:
-            continue
-        context = " ".join(
-            str(value)
-            for value in (
-                entry.get("authority") or "",
-                entry.get("notes") or "",
-                " ".join(str(item) for item in entry.get("aliases") or []),
-                " ".join(str(item) for item in entry.get("keywords") or []),
-                " ".join(str(item) for item in entry.get("domains") or []),
-                " ".join(str(item) for item in entry.get("subdomains") or []),
-            )
-        )
-        score = relevance_score(query, title, context)
-        if score < minimum_score:
-            continue
-        matches.append(
-            RegistryMatch(
-                source_id=str(entry.get("id") or "source_registry"),
-                title=title,
-                url=url,
-                authority=str(entry.get("authority") or ""),
-                reliability=str(entry.get("reliability") or ""),
-                source_type=str(entry.get("source_type") or ""),
-                score=score,
-            )
-        )
-    matches.sort(key=lambda item: (item.score, item.reliability in {"S", "A"}), reverse=True)
-    return matches[:limit]
+from src.websearch.relevance import relevance_score
 
 
 def infer_official_domains(query: str, jurisdiction: str | None, *, limit: int = 2) -> list[str]:

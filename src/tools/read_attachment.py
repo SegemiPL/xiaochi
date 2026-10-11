@@ -92,8 +92,8 @@ class AttachmentReadTool(BaseTool):
         if '://' in document_id or '/' in document_id or document_id.lower().endswith('.pdf'):
             return (f'error: "{document_id}" is a URL or file name, not a document_id. '
                     'A document_id comes ONLY from an <uploaded_document> block created when the '
-                    'user uploads a file. If the user gave you a web/PDF link, fetch it with '
-                    'WebFetchTool instead. Do NOT retry AttachmentReadTool with ids derived from '
+                    'user uploads a file. If the user gave you a web/PDF link, locate its source with '
+                    'WebSearchTool instead; search excerpts may not include the full text. Do NOT retry AttachmentReadTool with ids derived from '
                     'a URL.')
 
         # Cheap guards first: they do not consume the read budget.
@@ -152,7 +152,7 @@ class AttachmentReadTool(BaseTool):
                     + '. Do NOT guess any other id.')
         return ('No attachment has been uploaded in this session (there is no '
                 '<uploaded_document> block at all). If the user supplied a URL, it is a web '
-                'resource: use WebFetchTool on it instead. Do NOT retry AttachmentReadTool.')
+                'resource: use WebSearchTool to locate its source, or request the original file. Do NOT retry AttachmentReadTool.')
 
 
 def _select_by_locator(chunks: list, locator: str) -> list:

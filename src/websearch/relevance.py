@@ -32,7 +32,7 @@ def exact_title_search_query(query: str) -> tuple[str, str]:
     """Turn an explicit Chinese book-title citation into a compact exact query.
 
     Users commonly embed an exact regulation title inside a long natural-language
-    request. Sending that entire sentence to Chinese Bing produces morphological
+    request. Sending that entire sentence to web search produces unnecessary
     noise; the title plus an optional document number is the better discovery key.
     Already quoted queries are preserved because the caller has made an explicit
     search-strategy choice.

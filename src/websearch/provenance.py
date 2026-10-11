@@ -1,4 +1,4 @@
-"""Run-scoped provenance and failure tracking for web URLs."""
+"""Run-scoped provenance tracking for web URLs."""
 
 from __future__ import annotations
 
@@ -27,7 +27,6 @@ _TRAILING_URL_PUNCTUATION = "]},.;:，。；：！？!?"
 @dataclass
 class _RunUrlState:
     discovered: dict[str, str] = field(default_factory=dict)
-    failed: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 _run_states: dict[str, _RunUrlState] = {}
@@ -90,44 +89,6 @@ def get_url_provenance(url: str, *, run_id: str | None = None) -> str | None:
     if canonical in _registry_urls():
         return "sources_registry"
     return _get_state(run_id).discovered.get(canonical)
-
-
-def record_fetch_failure(
-    url: str,
-    *,
-    code: str,
-    message: str,
-    retryable: bool = False,
-    run_id: str | None = None,
-) -> dict[str, Any] | None:
-    canonical = canonicalize_url(url)
-    if canonical:
-        state = _get_state(run_id)
-        previous = state.failed.get(canonical)
-        attempts = int(previous.get("attempts", 0)) + 1 if previous else 1
-        failure = {
-            "code": code,
-            "message": message,
-            "retryable": retryable,
-            "attempts": attempts,
-        }
-        state.failed[canonical] = failure
-        return failure
-    return None
-
-
-def get_fetch_failure(url: str, *, run_id: str | None = None) -> dict[str, Any] | None:
-    canonical = canonicalize_url(url)
-    if canonical is None:
-        return None
-    return _get_state(run_id).failed.get(canonical)
-
-
-def clear_fetch_failure(url: str, *, run_id: str | None = None) -> None:
-    """Forget a stale failure after the URL gains a trusted provenance."""
-    canonical = canonicalize_url(url)
-    if canonical:
-        _get_state(run_id).failed.pop(canonical, None)
 
 
 def reset_provenance_state() -> None:

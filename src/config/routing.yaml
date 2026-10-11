@@ -12,8 +12,8 @@ classifications:
     agent: funds-compliance-analyst
 
   - id: tax
-    label: 税务
-    keywords: [预提税, 利得税, 企业所得税, GST, VAT, 税收协定, 股息, 利息, 特许权使用费, 服务费, 资本利得]
+    label: 税务政策与办税服务
+    keywords: [税收政策, 办税服务, 纳税咨询, 征收管理, 个人所得税, 增值税, 发票, 纳税信用, 优惠政策, 答复草拟, 税费计算, 预提税, 利得税, 企业所得税, GST, VAT, 税收协定, 股息, 利息, 特许权使用费, 服务费, 资本利得]
     agent: tax-policy-analyst
 
   - id: commercial
@@ -27,6 +27,19 @@ cross_domain_rules:
     secondary: funds
 
 subdomains:
+  tax:
+    - id: policy-query
+      label: 税收政策查询与适用条件
+      keywords: [税收政策, 优惠政策, 适用条件, 有效期, 政策依据]
+    - id: service-materials
+      label: 办税材料与征管服务
+      keywords: [办税材料, 申报, 缴纳, 发票, 征收管理, 纳税信用]
+    - id: reply-drafting
+      label: 咨询答复与工作文稿草拟
+      keywords: [纳税咨询, 答复草拟, 通知草稿, 工作文稿, 材料解读]
+    - id: tax-calculation
+      label: 税费计算与参数核对
+      keywords: [税额, 税率, 税基, 计算, 抵扣, 扣除]
   funds:
     - id: forex-administration
       label: 外汇管理

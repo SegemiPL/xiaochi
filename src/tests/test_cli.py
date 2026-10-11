@@ -23,7 +23,7 @@ class FakeAgent:
         yield [Message(ASSISTANT, "答案", name=self.name)]
 
 
-def test_cli_streams_answers_and_preserves_multi_turn_history():
+def test_cli_only_displays_completed_answers_and_preserves_multi_turn_history():
     agent = FakeAgent()
     output = StringIO()
     errors = StringIO()
@@ -35,8 +35,10 @@ def test_cli_streams_answers_and_preserves_multi_turn_history():
         error_stream=errors,
     )
 
-    assert output.getvalue().count("3wagent> 答案") == 2
-    assert errors.getvalue().count("[检索官方来源]") == 2
+    assert output.getvalue().count("小弛> 答案") == 2
+    assert "检索官方来源" not in errors.getvalue()
+    assert "小弛> 答\n" not in output.getvalue()
+    assert output.getvalue().count("以上内容由 AI 生成") == 2
     assert len(agent.calls) == 2
     assert [message.role for message in agent.calls[1]] == [USER, ASSISTANT, USER]
     assert agent.calls[1][-1].content == "第二个问题"
@@ -98,7 +100,8 @@ def test_cli_recovers_after_a_failed_turn():
         error_stream=errors,
     )
 
-    assert "RuntimeError: temporary failure" in errors.getvalue()
+    assert "暂时无法完成查询" in errors.getvalue()
+    assert "temporary failure" not in errors.getvalue()
     assert "恢复成功" in output.getvalue()
     assert len(agent.calls[1]) == 1
     assert agent.calls[1][0].content == "重试问题"

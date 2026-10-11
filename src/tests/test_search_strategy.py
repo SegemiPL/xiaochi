@@ -61,32 +61,30 @@ def test_chinese_exact_title_rejects_dictionary_noise():
     ) == 1.0
 
 
-def test_precise_registry_match_avoids_network(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
+def test_known_registry_title_still_searches_for_source_excerpts():
     tool = WebSearchTool()
+    calls = []
 
-    class FailNetworkClient:
+    class FakeClient:
         def search(self, query, **kwargs):
-            raise AssertionError("precise registry matches must not spend a web-search call")
+            calls.append(query)
+            return SearchResponse(query=query, engines=["deepseek-official"], results=[
+                SearchResult("境内企业境外发行证券和上市管理试行办法",
+                             "https://www.csrc.gov.cn/csrc/rule", "适用备案主体",
+                             "deepseek-official", "deepseek-official"),
+            ])
 
-    tool.client = FailNetworkClient()
-    payload = json.loads(
-        tool.call(
-            {
-                "query": "请根据《境内企业境外发行证券和上市管理试行办法》及其发布页面说明备案主体",
-                "jurisdiction": "CN",
-            }
-        )
-    )
-
-    assert payload["provider"] == "source_registry"
-    assert payload["quality"] == "strong"
-    assert any("正文" in item["title"] for item in payload["results"])
-    assert all(item["is_official"] for item in payload["results"])
+    tool.client = FakeClient()
+    payload = json.loads(tool.call({
+        "query": "请根据《境内企业境外发行证券和上市管理试行办法》说明备案主体",
+        "jurisdiction": "CN",
+    }))
+    assert calls == ['"境内企业境外发行证券和上市管理试行办法"']
+    assert payload["provider"] == "deepseek-official"
+    assert payload["results"][0]["snippet"] == "适用备案主体"
 
 
 def test_low_quality_results_trigger_one_official_domain_retry(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
     tool = WebSearchTool()
     calls = []
     monkeypatch.setattr(
@@ -96,29 +94,28 @@ def test_low_quality_results_trigger_one_official_domain_retry(monkeypatch):
 
     class FakeClient:
         def search(self, query, **kwargs):
-            calls.append((query, kwargs["engines"]))
+            calls.append((query, kwargs))
             if len(calls) == 1:
                 return SearchResponse(
                     query=query,
-                    engines=kwargs["engines"],
+                    engines=["deepseek-official"],
                     results=[
-                        SearchResult("境内_百度百科", "https://baike.baidu.com/item/x", "", "bing", "web"),
-                        SearchResult("中国证券监督管理委员会", "https://www.csrc.gov.cn/", "", "bing", "web"),
+                        SearchResult("境内_百度百科", "https://baike.baidu.com/item/x", "", "deepseek-official", "web"),
+                        SearchResult("中国证券监督管理委员会", "https://www.csrc.gov.cn/", "", "deepseek-official", "web"),
                     ],
                     partial_failures=[
-                        {"engine": "baidu", "code": "engine_error", "message": "302"},
-                        {"engine": "sogou", "code": "engine_error", "message": "verification"},
+                        {"engine": "deepseek-official", "code": "search_failed", "message": "tool error"},
                     ],
                 )
             return SearchResponse(
                 query=query,
-                engines=kwargs["engines"],
+                engines=["deepseek-official"],
                 results=[
                     SearchResult(
                         "全新证券监管测试办法",
                         "https://www.csrc.gov.cn/csrc/new-rule/content.shtml",
                         "证监会发布全新证券监管测试办法",
-                        "bing",
+                        "deepseek-official",
                         "web",
                     )
                 ],
@@ -130,28 +127,27 @@ def test_low_quality_results_trigger_one_official_domain_retry(monkeypatch):
     )
 
     assert calls[1][0].startswith("site:csrc.gov.cn ")
-    assert calls[1][1] == ["duckduckgo", "bing"]
+    assert calls[1][1] == {"limit": 10}
     assert payload["quality"] == "strong"
     assert payload["results"][0]["title"] == "全新证券监管测试办法"
     assert payload["discarded_low_relevance"] == 2
-    assert set(payload["failed_engines"]) == {"baidu", "sogou"}
+    assert payload["provider"] == "deepseek-official"
 
 
 def test_nonofficial_survivors_are_labeled_as_leads_not_usable_evidence(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
     tool = WebSearchTool()
 
     class FakeClient:
         def search(self, query, **kwargs):
             return SearchResponse(
                 query=query,
-                engines=["duckduckgo"],
+                engines=["deepseek-official"],
                 results=[
                     SearchResult(
                         "税务政策二手解读",
                         "https://example.com/commentary",
                         "税务政策二手解读",
-                        "duckduckgo",
+                        "deepseek-official",
                         "web",
                     )
                 ],
@@ -165,7 +161,6 @@ def test_nonofficial_survivors_are_labeled_as_leads_not_usable_evidence(monkeypa
 
 
 def test_tool_uses_exact_title_query_before_network_search(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
     tool = WebSearchTool()
     calls = []
 
@@ -174,13 +169,13 @@ def test_tool_uses_exact_title_query_before_network_search(monkeypatch):
             calls.append(query)
             return SearchResponse(
                 query=query,
-                engines=["bing"],
+                engines=["deepseek-official"],
                 results=[
                     SearchResult(
                         "测试监管文件全称",
                         "https://example.com/rule",
                         "测试监管文件全称",
-                        "bing",
+                        "deepseek-official",
                         "web",
                     )
                 ],
@@ -197,8 +192,6 @@ def test_tool_uses_exact_title_query_before_network_search(monkeypatch):
 
 
 def test_irrelevant_government_domain_cannot_hijack_official_retry(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
-    monkeypatch.setattr("src.tools.web_search.load_registry_matches", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         "src.tools.web_search.infer_official_domains",
         lambda query, jurisdiction: ["chinatax.gov.cn"],
@@ -212,18 +205,18 @@ def test_irrelevant_government_domain_cannot_hijack_official_retry(monkeypatch):
             if len(calls) == 1:
                 return SearchResponse(
                     query=query,
-                    engines=["bing"],
+                    engines=["deepseek-official"],
                     results=[
                         SearchResult(
                             "全国大学生数学建模竞赛论文",
                             "https://dxs.moe.gov.cn/modeling/",
                             "数学建模优秀论文",
-                            "bing",
+                            "deepseek-official",
                             "web",
                         )
                     ],
                 )
-            return SearchResponse(query=query, engines=["bing"], results=[])
+            return SearchResponse(query=query, engines=["deepseek-official"], results=[])
 
     tool.client = FakeClient()
     json.loads(
@@ -231,7 +224,6 @@ def test_irrelevant_government_domain_cannot_hijack_official_retry(monkeypatch):
             {
                 "query": "外籍个人 股息红利 个人所得税 政策",
                 "jurisdiction": "CN",
-                "engines": ["bing"],
             }
         )
     )
@@ -241,14 +233,13 @@ def test_irrelevant_government_domain_cannot_hijack_official_retry(monkeypatch):
 
 
 def test_repeated_long_query_paraphrase_is_stopped_before_network(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
     tool = WebSearchTool()
     calls = []
 
     class FakeClient:
         def search(self, query, **kwargs):
             calls.append(query)
-            return SearchResponse(query=query, engines=["bing"], results=[])
+            return SearchResponse(query=query, engines=["deepseek-official"], results=[])
 
     tool.client = FakeClient()
     first = json.loads(
@@ -270,49 +261,3 @@ def test_repeated_long_query_paraphrase_is_stopped_before_network(monkeypatch):
     assert second["error"]["code"] == "redundant_search_query"
     assert "STOP" in second["error"]["message"]
     assert len(calls) == 1
-
-
-def test_failed_engines_are_skipped_for_later_calls(monkeypatch):
-    monkeypatch.setenv("OPEN_WEBSEARCH_URL", "http://127.0.0.1:3210")
-    tool = WebSearchTool()
-    calls = []
-
-    class FakeClient:
-        def search(self, query, **kwargs):
-            calls.append(kwargs["engines"])
-            failures = []
-            if len(calls) == 1:
-                failures = [
-                    {"engine": "baidu", "code": "engine_error", "message": "302"},
-                    {"engine": "sogou", "code": "engine_error", "message": "verification"},
-                ]
-            return SearchResponse(
-                query=query,
-                engines=kwargs["engines"],
-                results=[
-                    SearchResult(
-                        query,
-                        "https://www.csrc.gov.cn/csrc/result.shtml",
-                        query,
-                        "bing",
-                        "web",
-                    )
-                ],
-                partial_failures=failures,
-            )
-
-    tool.client = FakeClient()
-    first = json.loads(
-        tool.call(
-            {"query": "测试规则甲", "jurisdiction": "CN", "engines": ["bing", "baidu", "sogou"]}
-        )
-    )
-    second = json.loads(
-        tool.call(
-            {"query": "测试规则乙", "jurisdiction": "CN", "engines": ["bing", "baidu", "sogou"]}
-        )
-    )
-
-    assert first["status"] == second["status"] == "ok"
-    assert calls == [["bing", "baidu", "sogou"], ["bing"]]
-    assert second["skipped_unhealthy_engines"] == ["baidu", "sogou"]

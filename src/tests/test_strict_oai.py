@@ -85,7 +85,7 @@ def test_sanitize_response_tail_drops_unresolved_tool_calls():
         Message(
             ASSISTANT,
             "",
-            function_call=FunctionCall(name="WebFetchTool", arguments='{"url":"https://x"}'),
+            function_call=FunctionCall(name="WebSearchTool", arguments='{"url":"https://x"}'),
             extra={"function_id": "call_unfinished"},
         ),
     ]
@@ -156,7 +156,7 @@ def test_sanitize_response_tail_keeps_answered_calls_and_final_text():
         Message(
             ASSISTANT,
             "",
-            function_call=FunctionCall(name="WebFetchTool", arguments='{"url":"https://x"}'),
+            function_call=FunctionCall(name="WebSearchTool", arguments='{"url":"https://x"}'),
             extra={"function_id": "call_unfinished"},
         ),
     ]

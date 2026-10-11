@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Union
 
 import yaml
 
+from src.config.env import get_env
+
 # Register the strict OpenAI-compatible transport before Qwen-Agent resolves
 # provider configs by model_type.
 from src.llm.strict_oai import StrictOpenAICompatibleModel  # noqa: F401
@@ -17,6 +19,10 @@ DEFAULT_CONFIG_PATH = Path(__file__).with_name("llm.yaml")
 # tool-layer helpers (e.g. the search-result judge) can build an LLM on the
 # same provider without threading the config through tool construction.
 _active_llm_config: Optional[Dict[str, Any]] = None
+
+
+class MissingAPIKeyError(RuntimeError):
+    """Server configuration is incomplete; do not disclose its details to clients."""
 
 
 def get_active_llm_config() -> Optional[Dict[str, Any]]:
@@ -65,15 +71,15 @@ def load_llm_config(
 
     api_key_env = provider_config.pop("api_key_env", None)
     if api_key_env:
-        api_key = os.getenv(api_key_env)
+        api_key = get_env(api_key_env)
         if not api_key:
-            raise RuntimeError(
+            raise MissingAPIKeyError(
                 f"Missing API key for provider '{selected_provider}'. "
                 f"Set the {api_key_env} environment variable."
             )
         provider_config["api_key"] = api_key
     elif not provider_config.get("api_key"):
-        raise RuntimeError(
+        raise MissingAPIKeyError(
             f"Provider '{selected_provider}' must define api_key or api_key_env"
         )
 

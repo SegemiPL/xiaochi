@@ -1,4 +1,4 @@
-# 3wagent 能力改进与实现状态
+# 小弛（基于 3wagent）能力改进与实现状态
 
 ## 1. 文档目的
 
@@ -46,12 +46,24 @@
 
 | 编号 | 能力 | 状态 | 最后更新 | 实现证据与缺口 |
 |---|---|---|---|---|
-| BASE-01 | 来源注册表优先、搜索相关性过滤、官方域自适应重试、失败引擎降级 | 🟡 部分实现 | 2026-09-13 | `src/websearch/relevance.py`、`src/websearch/registry.py`、`src/websearch/supervisor.py`、`src/tools/web_search.py`、`src/agent/judge.py`（LLM 二审）、`src/tests/test_search_strategy.py`、`src/tests/test_search_judge.py`、`src/tests/test_open_websearch.py`；已增加法规标题精确查询、近义重试熔断、主管机关域相关性约束、中英文来源别名、标准 HTTP 代理兼容及孤儿 daemon 安全接管；真实复测中 DuckDuckGo 对精确政策标题返回 3 条税务局官方页面，Bing 301 被隔离为部分失败；尚未纳入完整 eval 数据集和商业 API 兜底 |
-| BASE-02 | 官方 URL 来源追踪与抓取限制 | 🟡 部分实现 | 2026-09-11 | `src/websearch/provenance.py`、`src/tools/web_fetch.py`；可阻止猜测 URL，但长文档无法分段回读 |
+| BASE-01 | 来源注册表辅助、DeepSeek 原生搜索、相关性过滤与官方域有界重试 | 🟡 部分实现 | 2026-10-07 | `src/websearch/deepseek.py`、`src/tools/web_search.py`、`src/tests/test_deepseek_search.py`、`src/tests/test_search_strategy.py`；Messages 原生搜索复用密钥，保留相关性判断、官方域重试、原有每 Agent 15 次搜索保护和重复检查。撤销新增三次共享预算及 URL-only 强制结束，保留自主工具选择和按需委派。`src/websearch/sources.py` 为相关官方结果补齐 HTML 正文，分别统计正文及摘录。真实政策回归取得正文并正确回答文号、日期、范围、税率及废止关系，55.24 秒、四次工具搜索；42 题和广泛政策质量验收仍未完成 |
+| BASE-02 | 官方 URL 来源追踪与 HTML 正文读取 | 🟡 部分实现 | 2026-10-07 | `src/websearch/provenance.py`、`src/websearch/sources.py`、`src/tests/test_official_sources.py`、`src/tests/test_web_search_integration.py`；只读取 DeepSeek 发现的相关官方 HTML，返回正文、最终 URL、时间、哈希和截断标记；并行读取、失败换官方候选、15 分钟有界缓存。测试覆盖财政部/税务页面结构、中文编码、403、跳转/域名边界、缓存、缺正文和大小限制。未恢复旧 daemon/tool/远程 PDF；尚无持久快照、分块和定向回读 |
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
-| BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-09-11 | `src/agent/conversations.py` 保存消息；尚未保存结构化事实、结论、来源和计算状态 |
+| BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-10-07 | `src/agent/conversations.py` 保存内部与公开上下文，并支持移入 `.trash/` 删除和撤销恢复；`src/web/service.py`、`src/web/app.py` 对历史管理与运行互斥，API 仅返回公开记录；`src/tests/test_conversations.py`、`src/tests/test_xiaochi_web.py` 验证重启后仍删除、恢复原上下文/附件、其他记录不变及运行锁。尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-10-07 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；WebUI 使用宽幅响应式三栏布局，以弹性主对话区和降噪侧栏突出对话；`src/tests/test_webui_display.py` 覆盖布局样式钩子与断点  Inline microphone and per-reply speech icons; ASR/TTS: `src/voice/`, `src/agent/webui.py`; live SenseVoice/Fish calls and Gradio event construction verified; human microphone validation pending. See [voice integration](voice.md). |
+| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-11 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成；ASR/TTS 保留：原生麦克风、结论口播、首句预生成与分段播放，见 `src/web/voice.py`、`src/web/static/voice.js`。 |
+
+### 小弛产品重构（2026-10-07）
+
+| 编号 | 能力 | 状态 | 最后更新 | 实现证据与验收边界 |
+|---|---|---|---|---|
+| XIAOCHI-01 | 独立税务聊天前端 | ✅ 已完成 | 2026-10-08 | `src/web/static/`：依据用户汇小二截图调整为蓝白分区、细边框、小圆角和轻微阴影；左侧历史、中间咨询卡片、宽屏右侧官方政策入口/提问示例，窄屏保留主对话；补齐小弛品牌、官方入口标识与政策书册图标，本地资源及来源见 `src/web/static/icons/`，桌面/手机预览 `xiaochi-logos.jpg`、`xiaochi-logos-mobile.jpg`。每轮三个相关问题、历史/删除撤销、附件、复制与草稿行为保留；1280px桌面、1024px平板、390px手机检查无横向溢出，示例/推荐填入和历史切换正常；截图 `src/workspace/preview/xiaochi-refined-home.jpg`、`xiaochi-refined-answer.jpg`、`xiaochi-refined-mobile.jpg` |
+| XIAOCHI-02 | 税务部门角色、业务配置与报告模板 | 🟡 部分实现 | 2026-10-07 | `src/config/xiaochi.yaml`、`src/prompts/prompts.py` 与报告契约/模板；默认中国内地、结论在前、缺少条件先澄清。正确性与完整性优先，政策答案长度服从所需条件，不为提速强制拒答。`src/evals/xiaochi_smoke.py` 八个真实场景通过，含外籍个人分红正式文件、文号、执行日期、适用范围、税率和旧条款废止核验；一项政策回归不足以完成全面税务质量验收，参考站未成功加载 |
+| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-08 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复；`followups.py` 与 `test_followups.py` 验证推荐元数据不进入正文，非法/截断区块不暴露，思考/工具/专家不能提供推荐 |
+| XIAOCHI-04 | 本地 .env 加载与密钥隔离 | ✅ 已完成 | 2026-10-07 | `src/config/env.py` 固定仓库路径加载私有 `.env`、环境变量优先；聊天和搜索共享加载；`.gitignore` 覆盖且本机文件为 0600；`src/tests/test_env.py` 验证路径、优先级、共享凭据及缺失文件；真实调用验证成功，代码、报告及运行日志扫描未发现密钥值 |
+| XIAOCHI-05 | 每轮三个相关问题 | ✅ 已完成 | 2026-10-08 | `src/agent/followups.py`、`public_answer.py`、`src/web/service.py`、`static/app.js`：同轮生成、严格校验、按场景兜底、公开历史持久化；不增加独立模型请求或工具流程。`src/tests/test_followups.py` 与 `test_xiaochi_web.py` 覆盖异常元数据、内部信息隔离、新答复/恢复/删除撤销；真实计算和虚拟材料两项均返回模型生成的三个问题，点击填入及刷新一致。广泛推荐质量仍需后续样本迭代 |
+
+这里的完成状态仅针对所述界面与输出边界；当前是串行执行的本地单用户应用，账号、部门权限与多人部署不在本轮验收范围。
 
 ## 5. 待实现能力
 
@@ -59,7 +71,7 @@
 
 - **优先级：P0**
 - **状态：🟡 部分实现**
-- **最后更新：2026-09-12**
+- **最后更新：2026-10-07**
 - **覆盖题目：A01–A12、D08、E05、E06，以及所有短问**
 
 目标：所有问题继续使用 normal 模式，由主 agent 根据任务复杂度自主选择能力；子代理按需调用，不再让所有政策问题固定经过完整流水线。
@@ -80,13 +92,15 @@
 - E05 复用上轮研究，仅改变表达方式；
 - 复杂问题仍能主动使用检索、有效性核验和专业分析。
 
-实现证据：`src/agent/main_agent.py` 删除政策问题模式检测和固定流水线，所有输入统一进入 normal 模式主 agent；`src/tools/delegate_policy_task.py` 提供无前置顺序、单任务边界的可选专家委派（工具描述直接列出合法 capability 名，避免模型猜测浪费轮次）；`src/prompts/prompts.py` 定义最小能力集合、停止条件、短问/计算/改写直答和复杂问题分解原则；`workspace/<run-id>/capability_trace.jsonl` 记录工具、专家能力和选择原因；`src/tests/test_adaptive_orchestration.py` 覆盖 normal 模式、单专家隔离、错误能力拒绝和调试轨迹，`src/tests/test_open_websearch.py` 覆盖主 agent 工具能力与自适应提示契约。2026-09-12 两轮 22 个真实模型 CLI 用例（覆盖 A–E 五类）显示委派决策方向全部正确，但尚未形成结构化 smoke eval；完成 CAP-01 smoke eval 前维持"部分实现"。
+实现证据：`src/agent/main_agent.py` 删除政策问题模式检测和固定流水线，所有输入统一进入 normal 模式主 agent；`src/tools/delegate_policy_task.py` 提供无前置顺序、单任务边界的可选专家委派（工具描述直接列出合法 capability 名，避免模型猜测浪费轮次）；`src/prompts/prompts.py` 定义最小能力集合、停止条件、短问/计算/改写直答和复杂问题分解原则；`workspace/<run-id>/capability_trace.jsonl` 记录工具、专家能力和选择原因；`src/tests/test_adaptive_orchestration.py` 覆盖 normal 模式、单专家隔离、错误能力拒绝和调试轨迹，`src/tests/test_web_search_integration.py` 覆盖主 agent 工具能力与自适应提示契约。2026-09-12 两轮 22 个真实模型 CLI 用例（覆盖 A–E 五类）显示委派决策方向全部正确，但尚未形成结构化 smoke eval；完成 CAP-01 smoke eval 前维持"部分实现"。
+
+补充评测：`src/evals/xiaochi_smoke.py` 八个真实场景通过，简单算术、附件、改写和跨境澄清不触发无关检索；政策问题保留自主研究并取得官方正文。已撤销新增的共享预算和 URL-only 强制收尾，进度通知只观察执行阶段。该样本尚不覆盖全部 A–E 验收标准，状态保持部分实现。
 
 ### CAP-02：回答约束、错误前提与最小澄清
 
 - **优先级：P0**
 - **状态：🟡 部分实现**
-- **最后更新：2026-09-12**
+- **最后更新：2026-10-07**
 - **覆盖题目：A02、A05、A08、A10、E01–E03、E05**
 
 目标：研究前抽取用户的范围、日期、字数、语言、引用、计算和禁止扩展要求；区分事实、假设、用户主张和待核实前提。
@@ -101,7 +115,9 @@
 
 验收标准：E01 拒绝“统一按20%”的错误概括；E02 先确认法域、资产与角色；E03 不用无关资料填充；所有限字和不扩展要求得到遵守。
 
-实现证据：现有 prompt 已要求列出缺失事实，但没有结构化约束或稳定验收。
+实现证据：`src/config/xiaochi.yaml` 和 `src/prompts/prompts.py` 增加税务部门场景、首轮最多三项关键事实澄清、区分政策/推论/草稿与简洁答复；`src/tests/test_xiaochi_web.py` 验证身份与默认法域，`src/evals/xiaochi_smoke.py` 的真实 missing_facts 与 cross_border_clarification 场景通过，未列未经核实税率；增加普通咨询约 300 字及不扩展未问事项的约束。购房问题先询问身份、地区和资金条件，2.34 秒、无检索工具调用；这一变化缩小首轮范围，不代表完整政策分析等深度加速。尚无结构化 AnswerContract 或完整错误前提/限字评测，保持部分实现。
+
+2026-10-07 纠正：政策解释不能以缺口短答代替可查得的结论。提示词要求读取官方正文，失败换同文件其他官方来源，再报告具体缺口；正文长短服从正确性和适用条件。评测不再将拒答算成功，新增正式文件、执行日期、主体范围、税率及废止关系断言；用户政策问句真实通过。完整约束和错误前提题组仍待验收。
 
 ### CAP-03：结构化证据账本与结论级引用
 
@@ -135,9 +151,11 @@
 ### CAP-04：远程文档缓存、分块索引与定向回读
 
 - **优先级：P0**
-- **状态：⬜ 未开始**
-- **最后更新：2026-09-12**
+- **状态：🟡 部分实现**
+- **最后更新：2026-10-07**
 - **覆盖题目：A03–A06、A09、A10、A12、B01、C06、R09、R16、R18、R28、R30**
+
+当前范围说明：旧抓取工具和 daemon 已移除；2026-10-07 在 DeepSeek 搜索结果内部增加官方 HTML 读取和 15 分钟有界内存缓存。尚无持久不可变快照、远程 PDF、分块索引或定向回读，不能视为本项验收完成。
 
 目标：远程 HTML/PDF 第一次抓取后保存不可变快照并分块，后续按页码、条款、标题、关键词或相邻段落读取本地缓存。
 
@@ -152,7 +170,7 @@
 
 验收标准：长篇 HMRC、EUR-Lex、协定汇编和资本项目指引可读取任意相关章节；引用保留稳定页码/条款；8,000 字上下文限制不再造成内容永久不可见。
 
-实现证据：待补充。技术方案见 `sqlite-fts-rag-plan.md`。
+实现证据：`src/websearch/sources.py` 返回正文、哈希、读取时间、最终 URL 和截断标记，缓存重复读取，正文提取失败时保留原因并换官方候选；`src/tests/test_official_sources.py` 验证缓存、失败回退、编码、大小和文章来源结构；`src/evals/xiaochi_smoke.py` 验证真实官方正文取得。长文任意章节回读与稳定定位仍未实现，技术方案见 `sqlite-fts-rag-plan.md`。
 
 ### CAP-05：动态法域与来源覆盖
 
@@ -318,7 +336,7 @@
 
 | 阶段 | 内容 | 退出条件 |
 |---|---|---|
-| 0 | 搜索质量基线 | 注册表命中、相关性过滤、官方域重试和引擎降级进入稳定分支并完成实测 |
+| 0 | 搜索质量基线 | DeepSeek 原生搜索、注册表权威域推断、相关性过滤、官方域重试和提供方错误处理进入稳定分支并完成实测 |
 | 1 | CAP-01、CAP-02、CAP-11 smoke 集 | 短问、纯计算、错误前提和限字任务不再进入固定长流程 |
 | 2 | CAP-03、CAP-04 | 结论可回查到缓存文档的具体页码/条款，长文档可定向回读 |
 | 3 | CAP-05、CAP-06、CAP-10 | UK/AU/EU 可检索；多语言和历史版本可选择、可核验 |
@@ -328,6 +346,12 @@
 ## 7. 实现记录
 
 按时间倒序追加。每条记录应关联能力编号、代码或测试证据，并说明状态变化。
+
+### 2026-10-07
+
+- `BASE-06`：启动入口不再依赖本地搜索后台服务；完整回归发现原有侧栏 `gfm-like` Markdown 渲染缺少链接识别组件，在 Python 与 conda 依赖清单补充 `markdown-it-py[linkify]`，保持现有展示行为。验证由 `src/tests/test_webui_display.py` 和入口集成用例覆盖，完整回归 148 项通过。
+
+- `BASE-01`、`BASE-02`：联网搜索切换到 DeepSeek Harness `web-search-deepseek` 使用的 Anthropic 兼容 Messages 协议，复用 `DEEPSEEK_API_KEY`。新增原生结构化结果、引用摘录、来源日期、去重与截断、无搜索块拒绝、HTTP/工具错误、凭据轮换及重定向保护的离线回归；请求轨迹不含密钥，故障后本轮不再重复请求，取消海外引擎选择和 SearXNG 自动回退。按用户要求删除 OpenWebSearch daemon、客户端、SearXNG、WebFetchTool、远程 PDF 和 SAFE 专用链路及对应测试；入口不再管理后台服务，保留注册表、相关性审查与 DeepSeek 官方域重试。注册表元数据不再直接短路搜索，已知标题仍检索引用摘录；同步修改主／专家工具注册、附件 URL 提示及证据边界，运行时无需 Node.js。验证：`src/.venv/bin/python -B -m pytest -q src/tests` 完整回归 148 项通过；相关 Ruff 检查、`git diff --check` 和 `python -m src.main --help` 均通过。真实 API 验证因当前环境未设置密钥而未执行；两项状态均维持“部分实现”。
 
 ### 2026-09-13
 
@@ -349,6 +373,97 @@
 - `BASE-01`：实现通用搜索相关性评分、来源注册表精确匹配、官方域自适应重试和运行内失败引擎降级；新增 `src/tests/test_search_strategy.py`。完整测试集 132 项通过。状态记为“部分实现”，原因是尚未纳入 42 题 eval，也未完成真实来源的端到端基准。
 - 建立本文档，并将 42 道测试题映射为 CAP-01 至 CAP-11。
 
+### 2026-10-07：小池产品与公开答复重构
+
+- 先提交 `6852551` 保存 DeepSeek 原生搜索替换与旧 daemon/tool 删除，再进行本轮产品改造。
+- `BASE-04`、`BASE-06`、`XIAOCHI-01`、`XIAOCHI-03`：删除 Gradio 界面及原展示测试，新增独立前端、FastAPI、串行服务和公开答复边界，保留内部上下文、附件及政策链接；Web/CLI 只展示完成后的最终答复，统一追加 AI 提示。旧历史也经过投影；工具、思考、附件正文和配置异常详情不公开。缺少模型密钥时返回可操作的通用配置提示。
+- `BASE-01`、`CAP-02`、`XIAOCHI-02`：默认聊天改为 DeepSeek，搜索法域默认 CN，增加税务部门角色、业务配置与税务报告契约。产品身份契约检查通过；无真实密钥，未完成真实联网和税务答复质量评测，相关状态保持部分实现。
+- 验证：`src/.venv/bin/python -B -m pytest -q src/tests`（155 项通过）；新接口与答复边界的 scoped Ruff 检查通过。浏览器完成 1280×900 桌面、390×844 手机布局与历史菜单检查；模拟 3 秒 Agent 运行期间只显示等待提示，结束后一次展示带政策链接及 AI 提示的最终答复，刷新恢复同样内容。截图存于 `src/workspace/preview/`。参考站未成功加载，界面及话术依据需求独立实现。
+
+### 2026-10-07：私有 .env 与首轮真实模型迭代
+
+- `XIAOCHI-04`、`BASE-06`：在本地创建权限 0600 的 `.env`，Git ignore 生效且文件未被跟踪；新增 `config/env.py` 和显式 python-dotenv 依赖，聊天/搜索共用并保留环境优先级。`src/tests/test_env.py` 验证仓库路径、共享读取、优先级及缺失文件；没有向代码、报告或日志写入密钥。
+- `BASE-01`、`XIAOCHI-02`、`CAP-02`：真实 Chat Completions 和 Messages 原生搜索请求均成功。搜索返回结构化官方链接但无引用摘录，保持内容证据边界，并修复 URL-only 被标记 strong 的误导；新增 `official_excerpt_results`，明确仅链接时停止重复搜标题。初轮六个场景发现首轮澄清冗长和链接定位重复，改为最多三项关键事实、最多三个相关官方链接、业务语言说明缺口，并注入北京时间的当前日期。
+- `CAP-01` 评测基础：新增可复现的 `src/evals/xiaochi_smoke.py`，六个真实合成行为场景全部通过（身份、给定参数计算、多轮改写、澄清、附件、官方定位），报告为 `src/workspace/eval/xiaochi-smoke.json`；搜索场景从 22.73 秒及两次搜索改进为 9.63 秒及一次搜索。样本不代表实质税法质量或完整 42 题验收，各相关能力仍保持部分实现。
+- 验证：离线回归 158 项通过；改动涉及的新模块与搜索边界 Ruff 通过。真实浏览器完成 .env 生效后的最终计算答复测试，只显示等待提示与最终答复，截图 `src/workspace/preview/xiaochi-live.jpg`。服务已重启，本地预览可直接使用。
+
+
+### 2026-10-07：中文加粗与首轮响应优化
+
+- `BASE-06`、`XIAOCHI-01`：针对浏览器反馈的 `**中文：**①` 原样显示问题，新增 `src/web/markdown.py` 扩展 Markdown 分隔符规则，保持代码、转义与 HTML 禁用；`src/web/app.py` 对新答复和历史统一使用该渲染器。`src/tests/test_markdown.py` 和 `src/tests/test_xiaochi_web.py` 覆盖中文标点、嵌套链接、代码/转义、恶意 HTML 与历史恢复；浏览器确认原段落为 `strong`、字重 700，截图 `src/workspace/preview/xiaochi-bold-fixed.jpg`。
+- `CAP-01`、`CAP-02`、`XIAOCHI-02`：原购房问句运行约 55 秒、三次搜索，涉及未问的出租和持有税等议题。`src/prompts/prompts.py`、`src/config/xiaochi.yaml` 改为缺少主体/地区/资金条件时最多三项澄清，普通咨询约 300 字，不延伸未问事项。真实同问首轮 3.38 秒且无工具调用；答复深度不同，不能据此宣称完整分析同等加速，相关验收状态仍为部分实现。
+- `BASE-01`：`src/config/websearch.py`、`src/websearch/deepseek.py` 为原生搜索增加 `DEEPSEEK_SEARCH_EFFORT=low`；`src/agent/judge.py` 仅调整官方 DeepSeek 相关性判断的推理强度，不修改主回答配置。`src/tests/test_deepseek_search.py` 验证请求参数与覆盖设置，`src/tests/test_search_judge.py` 验证主配置不被修改。真实官方链接定位一次搜索、11.33 秒，保持原文缺失说明；单次数据尚不能证明检索本身提速。
+- 验证：170 项离线回归通过，七个真实模型合成行为场景 7/7 通过，报告 `src/workspace/eval/xiaochi-smoke.json`；改动文件 Ruff 通过（既有 judge 的异常类型规则不纳入本轮修改）。中英文 README 与运行指南同步更新。预览服务已重启，历史原文保存不变，重新加载后即可看到正确加粗。
+
+
+### 2026-10-07：小弛命名、书名号加粗与实际进度
+
+- `XIAOCHI-01`、`XIAOCHI-02`、`XIAOCHI-03`、`BASE-06`：将用户名称从“小池”更正为“小弛”，统一配置、角色、CLI、网页、头像和 favicon；兼容旧主 Agent 名称的历史投影。`src/web/markdown.py` 补齐中文与书名号/引号间的加粗开头规则，保持结尾、代码和转义处理。`src/tests/test_markdown.py` 与 `src/tests/test_xiaochi_web.py` 覆盖新旧答复渲染；浏览器确认用户原政策段落为 strong、字重 700，截图 `src/workspace/preview/xiaochi-title-bold-fixed.jpg`。
+- `XIAOCHI-03`、`BASE-04`：新增 `src/agent/progress.py` 的请求上下文通知和 `src/web/progress.py` 的有界内存快照；`src/web/service.py`、`src/web/app.py`、`src/web/static/app.js` 按 UUID 发布并每秒查询实际阶段，显示等待秒数，完成/失败后停止轮询。公开字段只有阶段、状态、固定话术与耗时；不包含模型思考、搜索词、文件路径或专家输出。`src/tests/test_progress.py`、`src/tests/test_xiaochi_web.py` 验证运行中可读、阶段白名单、上下文隔离、对话隔离、失败收尾与容量上限；浏览器真实检索显示“小弛正在检索官方政策……”，截图 `src/workspace/preview/xiaochi-progress.jpg`，完成后显示最终答复并恢复输入。
+- `BASE-01`、`CAP-01`、`CAP-02`：用户政策问句原记录从 15:49:43 至 15:52:42，约179秒，主代理八次搜索后委派专家。新增 `src/websearch/budget.py` 与 `config/xiaochi.yaml` 三次共享请求预算，覆盖主代理、同步专家及官方域重试。`src/agent/tool_loop_guard.py` 在相关官方候选仅有链接时结束检索，禁用工具生成简短缺口答复；保留完成的工具结果及匹配原生调用 ID，避免后续上下文丢失或 HTTP 400。`src/agent/main_agent.py`、`src/agent/subagent.py` 共用保留规则，`src/tests/test_web_search_integration.py` 覆盖来源保留、多工具 ID 与未执行调用清理，`src/tests/test_deepseek_search.py` 验证整轮预算跨客户端生效、下轮复位。
+- `CAP-02`、`XIAOCHI-02`：首轮澄清只含一句说明及至多三项问题、180字内；未取得正文的来源定位限制为三个链接及待核实项，正文350字内（URL不计），不根据标题断言执行日期或法律效果。首次真实迭代发现澄清超长和模型依标题作结论，收紧系统提示并增加运行时检索停止；修复后八个真实合成场景 8/8 通过，用户原政策问句16.22秒、一次搜索，阶段记录包含分析/检索/来源核对/整理；官方定位9.89秒。报告 `src/workspace/eval/xiaochi-smoke.json`。这些是范围和证据边界改进，不等同于实质税法质量验收，相关部分实现状态不变。
+- 验证：180 项离线回归通过；新模块、Web 边界、搜索与主 Agent 改动 Ruff 通过，旧专家模块的既有 star-import 问题未纳入本轮范围；文档和架构说明同步。预览服务已重启，原历史正文保存不变，重新载入可看到名称与加粗修复。
+
+### 2026-10-07：恢复自主研究并补齐官方正文
+
+- `CAP-01`、`BASE-01`：按用户“保持原来的 agent 逻辑”要求，移除新增的三次共享网络预算、`websearch/budget.py` 及仅有链接时强制终止逻辑；主 Agent 和专家恢复原研究与收尾路径。阶段通知继续只观察实际执行，不改变工具选择。原有每 Agent 15 次搜索保护和重复查询检查保留，效率改进集中在正文缓存、并行读取及足够证据后的自主停止。
+- `BASE-02`、`CAP-04`：新增 `src/websearch/sources.py`，在 `WebSearchTool` 内自动读取 DeepSeek 发现的相关官方 HTML 页面；每批三个页面，失败换其他候选，返回正文、最终 URL、时间、哈希、截断和失败原因；15 分钟有界内存缓存，网页请求无 API 凭据。`src/tests/test_official_sources.py` 覆盖实际财政部/税务页面形态、编码、缓存、403 回退、域名/跳转边界、大小和缺正文。未恢复旧 daemon、WebFetchTool 或远程 PDF；CAP-04 由未开始更新为部分实现，持久快照、分块及定向回读仍缺失。
+- `CAP-02`、`XIAOCHI-02`：纠正上一轮将简短原文缺口视为成功的验收；16.22 秒拒答没有完成用户任务，不能作为提速成果。`src/prompts/prompts.py` 与业务配置明确正确性、完整性优先，正文失败先尝试其他官方来源；`src/evals/xiaochi_smoke.py` 改为断言实际官方正文、正式文件、文号、执行日期、适用对象、20%税率及旧条款废止。
+- 验证：194 项离线回归通过；八个真实场景 8/8 通过，政策问句取得财政部/地方税务正文并正确回答，用时55.24秒、四次搜索工具调用，真实阶段包含检索、核对来源、读取材料和整理答复。浏览器复测同问成功，中文加粗标签均为 strong、字重700，小弛名称与统一提示正确，截图 `src/workspace/preview/xiaochi-policy-corrected.jpg`。相关 Ruff 与 diff 检查通过；README、运行指南和架构同步。以上证据覆盖一项政策回归，广泛政策质量及42题验收仍未完成，相关状态保留部分实现。
+
+### 2026-10-07：历史对话删除与撤销
+
+- `BASE-04`、`XIAOCHI-01`：`src/agent/conversations.py` 添加可恢复删除与恢复，记录移入 `.trash/`，附件及运行日志保留；`src/web/app.py` 提供删除/恢复接口，`src/web/service.py` 与 Agent 执行共用锁，运行中返回409，避免答复重新写回被删历史。BASE-04 保持部分实现，XIAOCHI-01 保持已完成。
+- `src/web/static/app.js`、`index.html`、`style.css`：历史条目右侧删除按钮、确认弹窗及撤销提示；键盘聚焦/桌面悬停可见，触屏直接显示。删除当前记录回到新对话，删除其他记录保留当前答复、草稿及附件选择，侧栏计数和记忆 ID 同步更新。
+- 验证：`src/tests/test_conversations.py`、`src/tests/test_xiaochi_web.py` 新增五项回归，覆盖重启、删除/恢复、私有上下文与附件保留、对话隔离、重复/非法请求、跨域及运行互斥；完整199项回归通过。浏览器仅用临时测试记录验证取消、删除其他对话不丢草稿、撤销、删除当前对话与刷新后不复现；桌面和手机布局检查通过。截图 `src/workspace/preview/xiaochi-history-delete.jpg`，相关 Ruff 与 diff 检查通过，README 与运行指南同步。
+
+### 2026-10-07：发送清空与计时文案
+
+- `XIAOCHI-01`、`XIAOCHI-03`：`src/web/static/app.js` 将计时改为“已深度思考 xx 秒”，起始即显示0秒，仍使用原本处理耗时与实际阶段。有效提交同步清空输入框并重置高度；请求失败恢复原草稿（包括空白、换行）和高度，已成功发送但后续刷新失败则不恢复，避免重复提交。两项状态保持已完成，不改 Agent 逻辑。
+- 验证：`node --check src/web/static/app.js`、`git diff --check` 通过；用不调用模型、隔离会话的临时浏览器预览验证提交中的输入为空、用户消息保留、计时新文案、成功后为空及失败恢复精确原文。截图 `src/workspace/preview/xiaochi-composer-cleared.jpg`。临时预览关闭，正式页面刷新加载静态改动。
+
+### 2026-10-07：政务蓝主题
+
+- `XIAOCHI-01`、`BASE-06`：`src/web/static/style.css` 统一深蓝主色、蓝灰正文、浅蓝侧栏/选中状态/用户消息与红色强调，移除原绿色及杂色图标配色；新建/发送采用深蓝，删除采用红色，悬停与聚焦同步。`index.html` 浏览器主题色、`favicon.svg` 同步为 `#164b87`，保留现有交互，相关状态维持已完成。
+- 验证：浏览器检查桌面首页、聊天正文/政策链接、历史选中、删除弹窗、390×844 手机首页与侧栏，页面无水平溢出；主题变量无缺失。正文、辅助文字、蓝色主按钮、红色删除按钮的配色对比度均超过4.5；`git diff --check` 通过。截图 `src/workspace/preview/xiaochi-government-blue.jpg` 与 `xiaochi-government-blue-mobile.jpg`，临时视口已恢复。README与架构同步。
+
+### 2026-10-07：移除历史标题圆圈
+
+- `XIAOCHI-01`：删除 `src/web/static/style.css` 的 `.history-item:before` 圆圈装饰，保留标题、选中状态及独立删除按钮，状态保持已完成。
+- 验证：浏览器全部三个现有历史条目的伪元素内容均为 `none`，标题与删除按钮正常；截图 `src/workspace/preview/xiaochi-history-no-circles.jpg`，`git diff --check` 通过。
+
+### 2026-10-07：移除顶部栏
+
+- `XIAOCHI-01`：`src/web/static/index.html` 删除顶部工作台/对话标题和智能辅助标记；`style.css` 删除对应样式及占位，桌面聊天区域从顶部开始。手机保留独立历史按钮，滚动区域避开按钮；`app.js` 删除标题节点引用和多余请求，同步菜单展开状态。状态保持已完成。
+- 验证：`node --check src/web/static/app.js`、`git diff --check` 通过；浏览器确认桌面无 header、工作区顶部为0，历史切换与新建正常；390×844 手机菜单展开、选择后收起和历史恢复正常，无水平溢出，滚动正文区域与按钮不重叠。截图 `src/workspace/preview/xiaochi-no-topbar.jpg`、`xiaochi-no-topbar-mobile.jpg`。临时视口恢复，未改 Agent 逻辑。
+
+### 2026-10-07：拆分提交与 PR 发布前检查
+
+- 汇总现有重构为共享环境/税务配置、官方正文检索、独立聊天与历史管理、文档/评测四个提交；此前的原生搜索迁移提交一并保留。相关能力状态不因发布而升级。
+- 验证：完整离线回归再次 199 项通过；前端 JavaScript 语法、diff 检查及新增/改动核心模块的定向 Ruff 检查通过。`config/llm.py` 只检查并修正导入格式，既有旧类型注解和异常类型规则未扩展处理；正文解析器补齐 ClassVar 与正则标志写法。`.env`、workspace 未跟踪且被忽略，候选提交文件未发现真实密钥或私钥。架构说明将评测场景数同步为实际八项；真实模型报告沿用本轮此前已取得的结果，发布检查未重复消耗模型 API。
+
+### 2026-10-08：简朴政务界面与相关问题
+
+- `XIAOCHI-01`、`XIAOCHI-03`、`XIAOCHI-05`：重写前端样式与首页文案，白灰为底、深蓝为操作色，去除装饰头像、宣传语、渐变、阴影、大圆角，保留明确的“发送”文字按钮和既有交互。汇小二参考页本轮未能加载，按用户指定的严肃、低调、简朴方向实现。
+- Web 主 Agent 仅增加最终输出的推荐协议，研究循环不变。三个推荐与本轮答案一起生成，提取为独立字段；格式异常、截断或旧历史按类型补足。推荐按钮填入输入框，不自动发送，复制答复不包含推荐。README、运行指南和架构同步。
+- 验证：211 项离线回归通过；相关 Ruff、JavaScript 语法和 diff 检查通过。真实 DeepSeek 算术与虚拟材料两项均取得模型生成的三个推荐，保存于 `src/workspace/eval/office-followups-2026-10-08.json`；浏览器验证三项显示、点击填入、刷新一致、历史恢复，桌面与390×844手机无横向溢出，菜单不覆盖正文。截图 `src/workspace/preview/xiaochi-office-home.jpg`、`xiaochi-office-answer.jpg`、`xiaochi-office-mobile.jpg`。本轮仅验证呈现和推荐，未重新验收广泛税务政策质量。
+
+### 2026-10-08：依据汇小二截图细化蓝白界面
+
+- `XIAOCHI-01`：根据用户提供的参考截图重排蓝白内容分区，保留历史侧栏及无顶部通栏布局；白色欢迎/答复卡片配细边框、小圆角和轻微阴影，输入框、发送按钮与三个推荐问题统一样式。新增官方政策资料外链和三条可填入草稿的提问示例；不添加登录、语音或其他未实现入口，不改变模型回答流程。
+- `src/web/static/index.html`、`style.css`、`app.js`、`favicon.svg` 为实现文件；国家税务总局、财政部和税收政策法规库入口已按官方页面核对。README 与架构同步。状态保持已完成。
+- 验证：桌面1280×720、平板1024×768、手机390×844浏览器检查无横向溢出；欢迎卡片和输入区不重叠，窄屏隐藏右侧栏，菜单与正文分离；历史答复及三个相关问题可恢复，提问示例/推荐点击填入正确草稿。`node --check`、`git diff --check` 通过。截图 `src/workspace/preview/xiaochi-refined-home.jpg`、`xiaochi-refined-answer.jpg`、`xiaochi-refined-mobile.jpg`。本轮为界面修改，不重复模型政策评测。
+
+### 2026-10-08：补齐品牌与政策入口图标
+
+- `XIAOCHI-01` 状态保持已完成，最后更新为2026-10-08。`src/web/static/index.html`、`style.css` 复用小弛 favicon 作为侧栏品牌标识；国家税务总局与财政部入口使用各自官网原始页头资源中的国徽，政策法规库使用自绘书册功能图标。资源保存在 `src/web/static/icons/`，同目录 README 记录来源与用途；不依赖远程热链，不修改 Agent 流程。
+- 验证：浏览器确认四个图标全部加载、官方入口名称与链接保留；1280×720 桌面与390×844手机侧栏无横向溢出，品牌名称不挤压，菜单展开/收起正常。截图 `src/workspace/preview/xiaochi-logos.jpg`、`xiaochi-logos-mobile.jpg`；`git diff --check` 通过。本轮仅静态界面修改，未重复模型评测。
+
+### 2026-10-11：界面与相关问题发布检查
+
+- 汇总蓝白政务界面、官方入口图标及每轮三个相关问题推荐，已有能力状态不因发布升级；沿用2026-10-08桌面/手机浏览器和真实推荐验证证据。
+- 发布前完整离线回归211项通过；核心改动定向 Ruff、前端 JavaScript 语法、`git diff --check` 通过。确认 `.env` 与 workspace 被忽略且未跟踪；不重复调用模型或扩大政策准确性结论。
+
 ### 2026-10-07: on-demand voice input and playback
 
 - `BASE-06`: added a separate Gradio ASR/TTS panel, editable transcripts before sending, configurable Fish voice, and a loopback-only service reusing the installed SenseVoice runtime. Files: `src/voice/`, `src/agent/webui.py`, `scripts/start-asr.sh`. Live ASR and Fish synthesis succeeded, and real Gradio component/event construction passed. Continuous listening, automatic submission and interruption are excluded. Human microphone and full research-flow validation remain pending; see `src/docs/voice.md`.
@@ -366,3 +481,10 @@
 - `BASE-06` (2026-10-07): added post-answer first-sentence prewarming (`src/voice/prepared.py`, `src/agent/webui.py`). Preparation is shared with early playback clicks, keyed by source and voice/model, and never synthesizes the remainder before a playback request. `client.py` keeps the first sentence separate; `ui.py` yields cached first audio before synthesizing the rest. Existing status unchanged.
 
   Validation: real model/Fish callback observed exactly one TTS call during prewarm (2.8 seconds); playback retrieved the first audio immediately without another TTS call, and only then made the second call. Running Gradio config confirms the background callback is chained after composer unlock.
+
+### 2026-10-11: merge native WebUI and voice integration
+
+- `BASE-06`：合并 `origin/main` 的小弛原生 FastAPI 页面、DeepSeek 搜索、历史恢复与追问；将本分支 Gradio 语音入口迁移到 `src/web/voice.py` 和 `src/web/static/voice.js`，保留 ASR、政策解读女声、模型口播整理、回答完成后只预生成首句、点击后边播边生成。旧 Gradio 页面与依赖按 main 移除，历史实现保留在合并前提交中。
+- 验证：Web/API、最终回答边界、追问、模型配置及语音接口的定向检查；语音只读取公开最终回答，不暴露中间 Agent 历史。新增 soundfile 与显式 tqdm 依赖，刷新 src/uv.lock。状态保持不变。
+
+  合并实测：42 项定向检查通过；原生 `/api/voice/asr` 将示例 WAV 转写为“好的，你说。”；浏览器音频播放时间正常推进，显示“政策解读女声 · 1/3”，未观察到播放错误。

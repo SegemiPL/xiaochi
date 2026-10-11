@@ -4,7 +4,7 @@ __pycache__/
 *.py[cod]
 .ruff_cache/
 
-# Local secrets and agent settings
+# Local .env API keys and agent settings; never commit real credentials
 .env
 .env.*
 .claude/settings.local.json

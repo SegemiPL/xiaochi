@@ -47,7 +47,7 @@ def test_native_function_call_passes_through_unchanged():
     message = Message(
         ASSISTANT,
         "",
-        function_call=FunctionCall(name="WebFetchTool", arguments='{"url": "https://x"}'),
+        function_call=FunctionCall(name="WebSearchTool", arguments='{"url": "https://x"}'),
     )
 
     assert normalize_textual_tool_calls([message]) == [message]
@@ -56,13 +56,13 @@ def test_native_function_call_passes_through_unchanged():
 def test_legacy_tool_call_tags_are_also_normalized():
     text = '''Checking now.
 <tool_call>
-{"name": "WebFetchTool", "arguments": {"url": "https://example.com"}}
+{"name": "WebSearchTool", "arguments": {"url": "https://example.com"}}
 </tool_call>'''
 
     output = normalize_textual_tool_calls([Message(ASSISTANT, text)])
 
     assert output[0].content == "Checking now."
-    assert output[1].function_call.name == "WebFetchTool"
+    assert output[1].function_call.name == "WebSearchTool"
     assert output[1].function_call.arguments == '{"url": "https://example.com"}'
 
 

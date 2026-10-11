@@ -34,17 +34,17 @@ def tool(tmp_path, monkeypatch):
 # ------------------------------------------------------------- URL guard
 
 
-def test_full_url_as_document_id_redirects_to_webfetch(tool):
+def test_full_url_as_document_id_redirects_to_websearch(tool):
     out = tool.call({'document_id': SAFE_PDF_URL})
     assert out.startswith('error:')
-    assert 'WebFetchTool' in out
+    assert 'WebSearchTool' in out
     assert 'Do NOT retry' in out
 
 
-def test_bare_pdf_filename_as_document_id_redirects_to_webfetch(tool):
+def test_bare_pdf_filename_as_document_id_redirects_to_websearch(tool):
     out = tool.call({'document_id': '3fbea410c6f24f56846afb57fc665630.pdf'})
     assert out.startswith('error:')
-    assert 'WebFetchTool' in out
+    assert 'WebSearchTool' in out
 
 
 # ------------------------------------------------- missing-id guidance
@@ -54,7 +54,7 @@ def test_unknown_id_without_any_upload_explains_and_redirects(tool):
     out = tool.call({'document_id': '3fbea410c6f2'})
     assert 'document not found: 3fbea410c6f2' in out
     assert 'No attachment has been uploaded' in out
-    assert 'WebFetchTool' in out
+    assert 'WebSearchTool' in out
 
 
 def test_unknown_id_lists_the_real_session_document_ids(tool):
