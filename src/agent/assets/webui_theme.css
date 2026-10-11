@@ -659,3 +659,31 @@ body {
 .w3-md blockquote {
   margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--w3-border); color: var(--w3-text-2);
 }
+
+/* Voice actions stay with the message and composer. */
+.gradio-container .w3-composer { align-items: center; gap: 8px; }
+.gradio-container .w3-composer .w3-chat-input { flex: 1; min-width: 0; }
+.gradio-container #w3-mic-button,
+.gradio-container .w3-read-reply {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 8px; border-radius: 9px;
+  border: 1px solid var(--w3-border); color: var(--w3-text-2);
+  background: var(--w3-panel); cursor: pointer;
+}
+.gradio-container #w3-mic-button { font-size: 0; min-width: 40px; height: 40px; }
+.gradio-container #w3-mic-button::before {
+  content: ''; width: 20px; height: 20px; background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Crect x='9' y='2' width='6' height='12' rx='3'/%3E%3Cpath d='M5 10v2a7 7 0 0014 0v-2M12 19v3m-4 0h8'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.gradio-container .w3-read-reply { width: 30px; height: 30px; margin: 5px 0; border-color: transparent; }
+.gradio-container #w3-mic-button:hover,
+.gradio-container .w3-read-reply:hover,
+.gradio-container .w3-read-reply[data-active] { color: var(--w3-accent); background: var(--w3-accent-soft); }
+.gradio-container #w3-mic-button:focus-visible,
+.gradio-container .w3-read-reply:focus-visible { outline: 2px solid var(--w3-accent); outline-offset: 2px; }
+.gradio-container .w3-voice-bridge { display: none !important; }
+.gradio-container #w3-voice-status { font-size: 12px; color: var(--w3-text-2); min-height: 0; }
+.gradio-container #w3-speech-player { border-radius: 10px; }
+
+.gradio-container #w3-speech-player:not(:has(audio[src])) { display: none; }
+.gradio-container .w3-read-reply[hidden] { display: none; }

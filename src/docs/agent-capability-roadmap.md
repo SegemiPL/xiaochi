@@ -51,7 +51,7 @@
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
 | BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-09-11 | `src/agent/conversations.py` 保存消息；尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-09-13 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；WebUI 使用宽幅响应式三栏布局，以弹性主对话区和降噪侧栏突出对话；`src/tests/test_webui_display.py` 覆盖布局样式钩子与断点 |
+| BASE-06 | CLI、WebUI 与多模型兼容 | ✅ 已完成 | 2026-10-07 | CLI、会话管理、DeepSeek/Qwen tool-call compatibility、strict OpenAI message conversion、terminal 中断后历史清洗（`sanitize_response_tail`）；WebUI 使用宽幅响应式三栏布局，以弹性主对话区和降噪侧栏突出对话；`src/tests/test_webui_display.py` 覆盖布局样式钩子与断点  Inline microphone and per-reply speech icons; ASR/TTS: `src/voice/`, `src/agent/webui.py`; live SenseVoice/Fish calls and Gradio event construction verified; human microphone validation pending. See [voice integration](voice.md). |
 
 ## 5. 待实现能力
 
@@ -348,3 +348,21 @@
 - `CAP-01`：移除政策问题模式检测和固定七步流水线，所有请求统一由 normal 模式主 agent 自适应处理；新增 `DelegatePolicyTask` 作为可选、可重复但不自动串联的专家能力，并写入按次能力选择轨迹；新增编排回归测试。机制实现完成，但真实模型 smoke eval 尚未执行，状态由“未开始”更新为“部分实现”。
 - `BASE-01`：实现通用搜索相关性评分、来源注册表精确匹配、官方域自适应重试和运行内失败引擎降级；新增 `src/tests/test_search_strategy.py`。完整测试集 132 项通过。状态记为“部分实现”，原因是尚未纳入 42 题 eval，也未完成真实来源的端到端基准。
 - 建立本文档，并将 42 道测试题映射为 CAP-01 至 CAP-11。
+
+### 2026-10-07: on-demand voice input and playback
+
+- `BASE-06`: added a separate Gradio ASR/TTS panel, editable transcripts before sending, configurable Fish voice, and a loopback-only service reusing the installed SenseVoice runtime. Files: `src/voice/`, `src/agent/webui.py`, `scripts/start-asr.sh`. Live ASR and Fish synthesis succeeded, and real Gradio component/event construction passed. Continuous listening, automatic submission and interruption are excluded. Human microphone and full research-flow validation remain pending; see `src/docs/voice.md`.
+
+- `BASE-06`: switched the default Fish voice to 沉稳讲解男声 (`e8370698972f418f9a53644786e90c75`). Started the actual WebUI on port 7860; browser synthesis produced 8.91 seconds of audio and playback advanced. Uploaded audio recognition and insertion into the composer succeeded. Local LLM service remains unavailable; no end-to-end research response was evaluated. Evidence: `src/voice/config.py`, `src/docs/voice.md`. Existing status unchanged.
+
+- `BASE-06` (2026-10-07): enabled DeepSeek as the default provider using `deepseek-flash`, verified against the authenticated models endpoint. Added `scripts/start-web.sh` to load the backend API key from environment or an ignored local file. Restarted the WebUI on port 7860 and verified a real greeting response through the browser. Evidence: `src/config/llm.yaml`, `scripts/start-web.sh`, run `20261007-144118`; no search-heavy evaluation was performed. Existing capability status unchanged.
+
+- `BASE-06` (2026-10-07): replaced the separate voice panel with a composer microphone icon and a speech action beside each main-agent reply. Recording completion inserts editable ASR text; selected replies synthesize through Fish and use a compact pause/replay player. Files: `src/agent/webui.py`, `src/agent/assets/voice_controls.js`, `webui_theme.css`, `src/voice/ui.py`. Real browser synthesis succeeded; physical microphone recording remains pending. Existing status unchanged.
+
+- `BASE-06` (2026-10-07): changed speech to short-segment streaming with synthesis overlapping playback, and switched Fish to 政策解读女声 (`0d6320cfd92647df829a687a7b586f8a`). Speech resolves the selected turn from backend history and reads only its final answer (the explicit conclusion section when present). Intermediate message controls are hidden. Evidence: `src/voice/client.py`, `ui.py`, `src/agent/assets/voice_controls.js`, actual browser multi-segment playback and conclusion-selection check. Existing status unchanged.
+
+- `BASE-06` (2026-10-07): added model-based spoken-conclusion preparation before Fish (`src/voice/narration.py`, `ui.py`). Keeps the full final answer as source, removes research/formatting artifacts, preserves qualifications, caches inspectable narration for 24 hours, and refuses raw-text fallback on failure. Existing streaming playback remains. Validation: actual recent answer normalized in 3.37 seconds (cache hit 0.001 seconds); a real formatter-to-Fish callback produced audio while retaining the 20-working-day condition, exclusion of correction time, and non-guarantee of approval. Injected formatting failure produced no Fish call. Capability status unchanged; model rewriting remains subject to semantic review.
+
+- `BASE-06` (2026-10-07): added post-answer first-sentence prewarming (`src/voice/prepared.py`, `src/agent/webui.py`). Preparation is shared with early playback clicks, keyed by source and voice/model, and never synthesizes the remainder before a playback request. `client.py` keeps the first sentence separate; `ui.py` yields cached first audio before synthesizing the rest. Existing status unchanged.
+
+  Validation: real model/Fish callback observed exactly one TTS call during prewarm (2.8 seconds); playback retrieved the first audio immediately without another TTS call, and only then made the second call. Running Gradio config confirms the background callback is chained after composer unlock.

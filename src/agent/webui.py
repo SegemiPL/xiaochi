@@ -545,13 +545,51 @@ class ThemedWebUI(WebUI):
                                                   'display': True
                                               }])
 
-                        input = mgr.MultimodalInput(
-                            placeholder=self.input_placeholder,
-                            elem_classes='w3-chat-input',
-                        )
-                        # Keep the vendor callback's audio argument without
-                        # rendering a separate microphone panel in the UI.
+                        from src.voice import ui as voice_ui
+                        speech_audio = gr.Audio(label='朗读', interactive=False,
+                                                autoplay=True, streaming=True, type='numpy',
+                                                elem_id='w3-speech-player', show_label=False,
+                                                waveform_options={'show_recording_waveform': False})
+                        with gr.Row(elem_classes='w3-composer'):
+                            input = mgr.MultimodalInput(
+                                placeholder=self.input_placeholder,
+                                elem_classes='w3-chat-input',
+                            )
+                            mic_button = gr.Button('语音输入', size='sm', min_width=40,
+                                                   scale=0, elem_id='w3-mic-button')
+                        # Raw recordings never enter the multimodal model input.
                         audio_input = gr.State(None)
+                        with gr.Column(visible=False, elem_id='w3-recorder') as recorder:
+                            microphone = gr.Audio(sources=['microphone'], type='filepath',
+                                                  format='wav', label='录音结束后自动填入输入框 · 最长 60 秒', max_length=60)
+                        voice_status = gr.Markdown('', elem_id='w3-voice-status')
+                        tts_text = gr.Textbox(elem_id='w3-tts-text', elem_classes='w3-voice-bridge')
+                        speak_button = gr.Button('朗读所选回复', elem_id='w3-tts-trigger',
+                                                 elem_classes='w3-voice-bridge')
+                        mic_button.click(lambda: gr.update(visible=True), outputs=[recorder],
+                                         queue=False, api_name=False).then(
+                            None, js="""async () => {
+                              for (let i = 0; i < 30; i++) {
+                                const root = document.getElementById('w3-recorder');
+                                const stop = root?.querySelector('.stop-button');
+                                if (stop?.getClientRects().length && getComputedStyle(stop).visibility !== 'hidden') {
+                                  stop.click(); return;
+                                }
+                                const record = root?.querySelector('.record-button');
+                                if (record?.getClientRects().length) {
+                                  record.click(); return;
+                                }
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                              }
+                            }""", queue=False)
+                        recognize_event = microphone.stop_recording(
+                            voice_ui.recognize_into_input, [microphone, input],
+                            [input, voice_status, recorder],
+                            concurrency_limit=1, concurrency_id='voice-asr', api_name=False)
+                        speak_event = speak_button.click(
+                            voice_ui.speak_inline, [tts_text, history], [speech_audio, voice_status],
+                            js="(text, history) => [String(window.w3VoiceTurn ?? -1), history]",
+                            concurrency_limit=1, concurrency_id='voice-tts', api_name=False)
 
                     with gr.Column(scale=1, min_width=210,
                                    elem_classes=['w3-sidebar', 'w3-sidebar-right']):
@@ -614,7 +652,11 @@ class ThemedWebUI(WebUI):
                             [chatbot, history],
                         )
 
-                    input_promise.then(self.flushed, None, [input])
+                    from src.voice.prepared import prewarm_latest
+                    prewarm_event = input_promise.then(self.flushed, None, [input]).then(
+                        prewarm_latest, [history], outputs=None,
+                        concurrency_limit=1, concurrency_id='voice-prewarm', api_name=False)
+
 
                     new_conversation_button.click(
                         fn=self.new_conversation,
@@ -634,12 +676,23 @@ class ThemedWebUI(WebUI):
                         cancels=[input_promise],
                     )
 
+                    def clear_voice():
+                        return None, '', None, '', gr.update(visible=False)
+
+                    for control, event_name in ((new_conversation_button, 'click'),
+                                                (conversation_selector, 'input')):
+                        getattr(control, event_name)(
+                            clear_voice, outputs=[microphone, tts_text, speech_audio,
+                                                  voice_status, recorder], queue=False,
+                            cancels=[recognize_event, speak_event, prewarm_event], api_name=False)
+
             timer = gr.Timer(1.0)
             timer.tick(fn=self._render_side_panels, outputs=[status_val, results_val])
 
             demo.load(None)
             demo.load(None, js=theme_toggle_js)
             demo.load(None, js=sidebar_js)
+            demo.load(None, js=Path(__file__).with_name("assets").joinpath("voice_controls.js").read_text())
 
         demo.queue(default_concurrency_limit=concurrency_limit).launch(share=share,
                                                                        server_name=server_name,

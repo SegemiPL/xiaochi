@@ -34,3 +34,6 @@ docs/
 !src/docs/**
 examples/
 .claude/
+
+# Server-only voice configuration and credential paths
+.local/
