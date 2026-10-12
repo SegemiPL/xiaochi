@@ -2,17 +2,18 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#265b91">
-  <title>小弛 · 税务工作辅助助手</title>
+  <meta name="theme-color" content="#235dab">
+  <title>小弛 · 政策与业务辅助助手</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/mascot/mascot.css">
   <script src="/static/voice.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
   <div class="shell">
     <aside class="sidebar" id="sidebar">
-      <a class="brand" href="/" aria-label="小弛首页"><img class="brand-logo" src="/static/favicon.svg" width="42" height="42" alt=""><span class="brand-name">小弛<span class="brand-rule" aria-hidden="true"></span><small>税务工作辅助</small></span></a>
+      <a class="brand" href="/" aria-label="小弛首页"><span class="brand-mascot" id="brand-mascot" data-state="idle" aria-hidden="true"><span class="mascot-sprite"></span><span class="mascot-dots"><i></i><i></i><i></i></span></span><span class="brand-name">小弛<small>政策与业务辅助</small></span></a>
       <button class="new-chat" id="new-chat"><span aria-hidden="true">＋</span> 新建对话</button>
       <div class="history-heading">历史对话 <span id="history-count">0</span></div>
       <nav id="history" aria-label="历史对话"><p class="history-empty">暂无历史对话</p></nav>
@@ -21,13 +22,29 @@
     <div class="scrim" id="scrim"></div>
     <main>
       <button class="menu-button" id="menu-button" aria-label="打开历史对话" aria-controls="sidebar" aria-expanded="false">☰</button>
-      <section class="workspace" aria-label="税务咨询工作区">
+      <section class="workspace" aria-label="业务咨询工作区">
         <div class="welcome" id="welcome">
-          <div class="welcome-kicker">业务工作台</div>
-          <h1>税务政策与业务辅助</h1>
-          <p class="intro">政策查询、材料解读、答复草拟与税费核算。</p>
-          <h2 class="section-label">选择需要处理的事项</h2>
-          <div class="suggestions" id="suggestions"></div>
+          <div class="welcome-heading">
+            <div class="welcome-copy">
+              <div class="welcome-kicker">业务工作台</div>
+              <h1>政策查询与业务辅助</h1>
+              <p class="intro">税收、外汇、商务发改事项查询与材料辅助。</p>
+            </div>
+            <svg class="welcome-graphic" viewBox="0 0 144 136" fill="none" aria-hidden="true">
+              <circle cx="74" cy="68" r="59" fill="#edf4fd"/>
+              <circle class="graphic-orbit" cx="74" cy="68" r="64" stroke="#a8c4e8" stroke-dasharray="3 10"/>
+              <path d="M43 22h49l18 18v73H43V22Z" fill="white" stroke="#7099cb" stroke-width="1.5"/>
+              <path d="M92 22v18h18" fill="#dbe9fb" stroke="#7099cb" stroke-width="1.5"/>
+              <path d="M55 53h37M55 65h43M55 77h29M55 89h23" stroke="#6b93c5" stroke-width="3" stroke-linecap="round"/>
+              <path d="M33 22h6v91h-6" fill="#235dab"/>
+              <circle cx="104" cy="100" r="20" fill="#b83842"/>
+              <path d="m95 100 6 6 12-13" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M14 45h12M20 39v12" stroke="#b83842" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 class="section-label">选择业务类别与办理事项</h2>
+          <div class="business-tabs" id="business-tabs" role="group" aria-label="业务类别"></div>
+          <div class="suggestions" id="suggestions" aria-label="税收业务事项"></div>
           <p class="welcome-note">提问时请说明适用地区、所属期和具体情形；可附相关材料。</p>
         </div>
         <div class="messages" id="messages" aria-live="polite" aria-label="对话内容"></div>
@@ -36,11 +53,10 @@
           <div class="history-notice" id="history-notice" role="status" hidden>
             <span>已删除对话</span><button type="button" id="undo-delete">撤销</button>
           </div>
-          <div class="composer-heading"><span>提出问题</span><span>可附相关材料</span></div>
           <form class="composer" id="chat-form">
             <div class="attachment-list" id="attachments"></div>
-            <label class="sr-only" for="question">请输入您的税务问题</label>
-            <textarea id="question" rows="2" placeholder="请输入需要查询或处理的事项…" maxlength="20000"></textarea>
+            <label class="sr-only" for="question">请输入您的业务问题</label>
+            <textarea id="question" rows="4" placeholder="请输入您的问题，可说明办理事项、适用地区和业务所属期…" maxlength="20000"></textarea>
             <div class="composer-toolbar">
               <button class="voice-icon" type="button" id="mic-button" aria-label="语音输入" title="语音输入"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0014 0v-2M12 19v3m-4 0h8"/></svg></button>
               <button class="attach-button" type="button" id="attach-button" aria-label="上传附件"><span>＋</span> 上传材料</button>
@@ -49,7 +65,6 @@
               <button class="send-button" id="send-button" type="submit" aria-label="发送问题">发送</button>
             </div>
           </form>
-          <p class="footer-note" id="footer-note">以上内容由 AI 生成，仅供参考，具体请以现行有效政策及主管税务机关确认口径为准。</p>
         </div>
       </section>
       <aside class="resource-rail" aria-label="政策资料与提问参考">
@@ -58,6 +73,8 @@
           <nav class="resource-links" aria-label="官方政策网站">
             <a href="https://www.chinatax.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img class="ministry-logo" src="/static/icons/tax-header.png" width="30" height="32" alt=""></span><span>国家税务总局<small>税收政策与纳税服务</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
             <a href="https://www.mof.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img class="ministry-logo" src="/static/icons/mof-header.png" width="30" height="32" alt=""></span><span>财政部<small>财政政策与公告</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
+            <a href="https://www.safe.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img src="/static/icons/safe.ico" width="30" height="30" alt=""></span><span>国家外汇管理局<small>外汇政策与业务指南</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
+            <a href="https://www.ndrc.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img class="ministry-logo" src="/static/icons/ndrc-header.png" width="30" height="32" alt=""></span><span>国家发展改革委<small>投资管理与项目政策</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
             <a href="https://fgk.chinatax.gov.cn/" target="_blank" rel="noopener noreferrer"><span class="resource-symbol" aria-hidden="true"><img src="/static/icons/policy-library.svg" width="28" height="28" alt=""></span><span>税收政策法规库<small>文件检索与政策解读</small></span><span class="external-arrow" aria-hidden="true">↗</span></a>
           </nav>
         </section>
@@ -65,8 +82,8 @@
           <h2>提问示例</h2>
           <div class="example-questions">
             <button type="button" data-question="请帮我查询一项税收优惠政策，说明需要提供哪些主体、地区和所属期信息。"><span aria-hidden="true">01</span>查询税收优惠的适用条件</button>
-            <button type="button" data-question="请帮我将一份办税材料整理成核对清单，我会上传材料。"><span aria-hidden="true">02</span>整理办税材料核对清单</button>
-            <button type="button" data-question="请协助起草一份纳税咨询答复，先说明需要提供哪些具体事实。"><span aria-hidden="true">03</span>起草一份纳税咨询答复</button>
+            <button type="button" data-question="请帮我查询服务贸易对外支付涉及的外汇和税务手续，先说明需要提供哪些主体、交易和所属期信息。"><span aria-hidden="true">02</span>核对贸易对外支付手续</button>
+            <button type="button" data-question="请帮我梳理企业境外投资涉及的商务和发改备案或核准事项，先说明需要确认哪些项目事实。"><span aria-hidden="true">03</span>梳理境外投资办理事项</button>
           </div>
         </section>
         <section class="usage-note">
