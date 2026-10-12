@@ -190,3 +190,13 @@ textarea::placeholder { color: #6e7781; }
   .history-delete { opacity: 1; }
 }
 @media (hover: none) { .history-delete { opacity: 1; } }
+
+.voice-action { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:10px 0; }
+.voice-icon { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; padding:7px; border:1px solid var(--line); border-radius:9px; background:transparent; color:var(--primary); cursor:pointer; }
+.voice-icon svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.voice-icon:hover { background:var(--selected); }
+.voice-icon:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.voice-icon.recording { color:#b83b3b; background:#fff0f0; }
+.voice-note { font-size:12px; color:var(--muted); }
+.voice-action audio { width:min(100%,340px); height:34px; }
+.voice-action audio[hidden] { display:none; }

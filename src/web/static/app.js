@@ -31,9 +31,11 @@ function assistantLabel() {
 function renderMessages(waiting = false) {
   $('messages').replaceChildren();
   $('welcome').hidden = state.messages.length > 0 || waiting;
+  let voiceTurn = -1;
   for (const item of state.messages) {
     const message = document.createElement('article'); message.className = `message ${item.role}`;
     if (item.role === 'user') {
+      voiceTurn++;
       if (item.content) {const bubble = document.createElement('div'); bubble.className = 'user-bubble'; bubble.textContent = item.content; message.append(bubble);}
       for (const name of item.attachments || []) {const file = document.createElement('div'); file.className = 'uploaded'; file.textContent = `▤ ${name}`; message.append(file);}
     } else {
@@ -45,7 +47,7 @@ function renderMessages(waiting = false) {
       message.append(answer);
       const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'copy-button'; copy.textContent = '复制答复';
       copy.addEventListener('click', async () => {try {await navigator.clipboard.writeText(item.content); copy.textContent = '已复制';} catch (_) {showError('浏览器未允许复制，请选择答复文字手动复制。');}});
-      message.append(copy);
+      message.append(copy, voiceButton(state.id, voiceTurn));
       if (Array.isArray(item.related_questions) && item.related_questions.length === 3) {
         const related = document.createElement('section'); related.className = 'related-questions'; related.setAttribute('aria-label', '相关问题');
         const heading = document.createElement('h3'); heading.textContent = '相关问题';
@@ -119,6 +121,7 @@ async function refreshHistory() {
 }
 async function selectConversation(id) {
   if (state.busy) return;
+  stopVoice();
   setBusy(true); showError();
   try {
     const record = await api(`/api/conversations/${id}`);
@@ -133,6 +136,7 @@ async function ensureConversation() {
   return state.id;
 }
 function resetConversation() {
+  stopVoice();
   state.id = null; state.messages = []; state.attachments = []; localStorage.removeItem('xiaochi-conversation');
   $('question').value = ''; $('question').style.height = 'auto';
   showError(); renderAttachments(); renderMessages(); closeMenu();
@@ -167,6 +171,7 @@ $('menu-button').addEventListener('click', () => {
   $('menu-button').setAttribute('aria-expanded', String(open));
 });
 $('scrim').addEventListener('click', closeMenu);
+$('mic-button').addEventListener('click', toggleMicrophone);
 $('attach-button').addEventListener('click', () => $('file-input').click());
 $('file-input').addEventListener('change', async () => {
   if (state.busy) return;
@@ -183,6 +188,7 @@ $('question').addEventListener('keydown', event => {if (event.key === 'Enter' &&
 $('question').addEventListener('input', () => {$('question').style.height = 'auto'; $('question').style.height = `${Math.min($('question').scrollHeight, 180)}px`;});
 $('chat-form').addEventListener('submit', async event => {
   event.preventDefault(); if (state.busy) return;
+  stopVoice();
   const draft = $('question').value; const draftHeight = $('question').style.height;
   const text = draft.trim(); if (!text && !state.attachments.length) { $('question').focus(); return; }
   let committed = false;

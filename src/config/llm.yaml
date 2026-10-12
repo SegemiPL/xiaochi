@@ -6,7 +6,7 @@ default_provider: deepseek
 
 providers:
   deepseek:
-    model: deepseek-v4-flash
+    model: deepseek-flash
     model_type: strict_oai
     model_server: https://api.deepseek.com
     api_key_env: DEEPSEEK_API_KEY

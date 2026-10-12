@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -44,6 +44,8 @@ def create_app(*, agent_factory=None, store=None, upload_root=None) -> FastAPI:
     service = ChatService(store, agent_factory, upload_root)
     app = FastAPI(title='小弛', docs_url=None, redoc_url=None, openapi_url=None)
     app.state.chat_service = service
+    from src.web.voice import install_voice
+    prewarm_voice = install_voice(app, service)
 
     @app.middleware('http')
     async def same_origin_mutations(request: Request, call_next):
@@ -142,7 +144,7 @@ def create_app(*, agent_factory=None, store=None, upload_root=None) -> FastAPI:
         return {'id': upload_id, 'name': name}
 
     @app.post('/api/conversations/{conversation_id}/messages')
-    def chat(conversation_id: str, body: ChatRequest):
+    def chat(conversation_id: str, body: ChatRequest, background_tasks: BackgroundTasks):
         existing(conversation_id)
         text = body.message.strip()
         if not text and not body.attachments:
@@ -159,6 +161,7 @@ def create_app(*, agent_factory=None, store=None, upload_root=None) -> FastAPI:
         except Exception:
             LOGGER.exception('Xiaochi turn failed')
             raise HTTPException(502, '暂时无法完成查询，请稍后重试。') from None
+        background_tasks.add_task(prewarm_voice, conversation_id)
         return {**result, 'answer_html': render_answer(result['answer'])}
 
     @app.get('/')

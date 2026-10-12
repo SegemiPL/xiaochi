@@ -18,7 +18,7 @@ def test_default_provider_is_deepseek(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     config = load_llm_config(config_path=CONFIG_PATH)
-    assert config["model"] == "deepseek-v4-flash"
+    assert config["model"] == "deepseek-flash"
     assert config["api_key"] == "test-key"
 
 

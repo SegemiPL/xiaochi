@@ -6,6 +6,7 @@
   <title>小弛 · 税务工作辅助助手</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/voice.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -41,6 +42,7 @@
             <label class="sr-only" for="question">请输入您的税务问题</label>
             <textarea id="question" rows="2" placeholder="请输入需要查询或处理的事项…" maxlength="20000"></textarea>
             <div class="composer-toolbar">
+              <button class="voice-icon" type="button" id="mic-button" aria-label="语音输入" title="语音输入"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0014 0v-2M12 19v3m-4 0h8"/></svg></button>
               <button class="attach-button" type="button" id="attach-button" aria-label="上传附件"><span>＋</span> 上传材料</button>
               <input type="file" id="file-input" accept=".pdf,.docx,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.markdown,.yaml,.yml" multiple hidden>
               <span class="input-hint">Enter 发送 · Shift + Enter 换行</span>

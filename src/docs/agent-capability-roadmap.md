@@ -51,7 +51,7 @@
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
 | BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-10-07 | `src/agent/conversations.py` 保存内部与公开上下文，并支持移入 `.trash/` 删除和撤销恢复；`src/web/service.py`、`src/web/app.py` 对历史管理与运行互斥，API 仅返回公开记录；`src/tests/test_conversations.py`、`src/tests/test_xiaochi_web.py` 验证重启后仍删除、恢复原上下文/附件、其他记录不变及运行锁。尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-07 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成 |
+| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-11 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成；ASR/TTS 保留：原生麦克风、结论口播、首句预生成与分段播放，见 `src/web/voice.py`、`src/web/static/voice.js`。 |
 
 ### 小弛产品重构（2026-10-07）
 
@@ -463,3 +463,28 @@
 
 - 汇总蓝白政务界面、官方入口图标及每轮三个相关问题推荐，已有能力状态不因发布升级；沿用2026-10-08桌面/手机浏览器和真实推荐验证证据。
 - 发布前完整离线回归211项通过；核心改动定向 Ruff、前端 JavaScript 语法、`git diff --check` 通过。确认 `.env` 与 workspace 被忽略且未跟踪；不重复调用模型或扩大政策准确性结论。
+
+### 2026-10-07: on-demand voice input and playback
+
+- `BASE-06`: added a separate Gradio ASR/TTS panel, editable transcripts before sending, configurable Fish voice, and a loopback-only service reusing the installed SenseVoice runtime. Files: `src/voice/`, `src/agent/webui.py`, `scripts/start-asr.sh`. Live ASR and Fish synthesis succeeded, and real Gradio component/event construction passed. Continuous listening, automatic submission and interruption are excluded. Human microphone and full research-flow validation remain pending; see `src/docs/voice.md`.
+
+- `BASE-06`: switched the default Fish voice to 沉稳讲解男声 (`e8370698972f418f9a53644786e90c75`). Started the actual WebUI on port 7860; browser synthesis produced 8.91 seconds of audio and playback advanced. Uploaded audio recognition and insertion into the composer succeeded. Local LLM service remains unavailable; no end-to-end research response was evaluated. Evidence: `src/voice/config.py`, `src/docs/voice.md`. Existing status unchanged.
+
+- `BASE-06` (2026-10-07): enabled DeepSeek as the default provider using `deepseek-flash`, verified against the authenticated models endpoint. Added `scripts/start-web.sh` to load the backend API key from environment or an ignored local file. Restarted the WebUI on port 7860 and verified a real greeting response through the browser. Evidence: `src/config/llm.yaml`, `scripts/start-web.sh`, run `20261007-144118`; no search-heavy evaluation was performed. Existing capability status unchanged.
+
+- `BASE-06` (2026-10-07): replaced the separate voice panel with a composer microphone icon and a speech action beside each main-agent reply. Recording completion inserts editable ASR text; selected replies synthesize through Fish and use a compact pause/replay player. Files: `src/agent/webui.py`, `src/agent/assets/voice_controls.js`, `webui_theme.css`, `src/voice/ui.py`. Real browser synthesis succeeded; physical microphone recording remains pending. Existing status unchanged.
+
+- `BASE-06` (2026-10-07): changed speech to short-segment streaming with synthesis overlapping playback, and switched Fish to 政策解读女声 (`0d6320cfd92647df829a687a7b586f8a`). Speech resolves the selected turn from backend history and reads only its final answer (the explicit conclusion section when present). Intermediate message controls are hidden. Evidence: `src/voice/client.py`, `ui.py`, `src/agent/assets/voice_controls.js`, actual browser multi-segment playback and conclusion-selection check. Existing status unchanged.
+
+- `BASE-06` (2026-10-07): added model-based spoken-conclusion preparation before Fish (`src/voice/narration.py`, `ui.py`). Keeps the full final answer as source, removes research/formatting artifacts, preserves qualifications, caches inspectable narration for 24 hours, and refuses raw-text fallback on failure. Existing streaming playback remains. Validation: actual recent answer normalized in 3.37 seconds (cache hit 0.001 seconds); a real formatter-to-Fish callback produced audio while retaining the 20-working-day condition, exclusion of correction time, and non-guarantee of approval. Injected formatting failure produced no Fish call. Capability status unchanged; model rewriting remains subject to semantic review.
+
+- `BASE-06` (2026-10-07): added post-answer first-sentence prewarming (`src/voice/prepared.py`, `src/agent/webui.py`). Preparation is shared with early playback clicks, keyed by source and voice/model, and never synthesizes the remainder before a playback request. `client.py` keeps the first sentence separate; `ui.py` yields cached first audio before synthesizing the rest. Existing status unchanged.
+
+  Validation: real model/Fish callback observed exactly one TTS call during prewarm (2.8 seconds); playback retrieved the first audio immediately without another TTS call, and only then made the second call. Running Gradio config confirms the background callback is chained after composer unlock.
+
+### 2026-10-11: merge native WebUI and voice integration
+
+- `BASE-06`：合并 `origin/main` 的小弛原生 FastAPI 页面、DeepSeek 搜索、历史恢复与追问；将本分支 Gradio 语音入口迁移到 `src/web/voice.py` 和 `src/web/static/voice.js`，保留 ASR、政策解读女声、模型口播整理、回答完成后只预生成首句、点击后边播边生成。旧 Gradio 页面与依赖按 main 移除，历史实现保留在合并前提交中。
+- 验证：Web/API、最终回答边界、追问、模型配置及语音接口的定向检查；语音只读取公开最终回答，不暴露中间 Agent 历史。新增 soundfile 与显式 tqdm 依赖，刷新 src/uv.lock。状态保持不变。
+
+  合并实测：42 项定向检查通过；原生 `/api/voice/asr` 将示例 WAV 转写为“好的，你说。”；浏览器音频播放时间正常推进，显示“政策解读女声 · 1/3”，未观察到播放错误。
