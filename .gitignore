@@ -7,6 +7,7 @@ __pycache__/
 # Local .env API keys and agent settings; never commit real credentials
 .env
 .env.*
+!.env.example
 .claude/settings.local.json
 
 # Generated reports

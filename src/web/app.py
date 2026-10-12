@@ -68,7 +68,8 @@ def create_app(*, agent_factory=None, store=None, upload_root=None) -> FastAPI:
 
     @app.get('/api/config')
     def config():
-        return {key: PRODUCT[key] for key in ('name', 'tagline', 'disclaimer', 'quick_questions')}
+        return {key: PRODUCT[key] for key in
+                ('name', 'tagline', 'disclaimer', 'quick_questions', 'business_categories')}
 
     @app.get('/api/conversations')
     def conversations():

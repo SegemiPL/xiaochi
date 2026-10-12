@@ -4,6 +4,15 @@ const state = {id: null, messages: [], attachments: [], busy: false};
 let agentName = '小弛';
 let pendingDelete = null;
 let lastDeleted = null;
+let historyNoticeTimer = null;
+function hideHistoryNotice() {
+  clearTimeout(historyNoticeTimer); historyNoticeTimer = null;
+  lastDeleted = null; $('history-notice').hidden = true;
+}
+function showHistoryNotice(item) {
+  hideHistoryNotice(); lastDeleted = item; $('history-notice').hidden = false;
+  historyNoticeTimer = setTimeout(hideHistoryNotice, 8000);
+}
 async function api(path, options = {}) {
   const response = await fetch(path, options);
   const data = await response.json();
@@ -13,6 +22,7 @@ async function api(path, options = {}) {
 function showError(message = '') { $('error').textContent = message; $('error').hidden = !message; }
 function setBusy(value) {
   state.busy = value;
+  $('brand-mascot').dataset.state = value ? 'busy' : 'idle';
   for (const button of document.querySelectorAll('button')) button.disabled = value;
   $('question').readOnly = value;
   $('send-button').textContent = value ? '处理中' : '发送';
@@ -121,6 +131,7 @@ async function refreshHistory() {
 }
 async function selectConversation(id) {
   if (state.busy) return;
+  hideHistoryNotice();
   stopVoice();
   setBusy(true); showError();
   try {
@@ -136,6 +147,7 @@ async function ensureConversation() {
   return state.id;
 }
 function resetConversation() {
+  hideHistoryNotice();
   stopVoice();
   state.id = null; state.messages = []; state.attachments = []; localStorage.removeItem('xiaochi-conversation');
   $('question').value = ''; $('question').style.height = 'auto';
@@ -154,17 +166,21 @@ $('delete-confirm').addEventListener('click', async () => {
   try {
     await api(`/api/conversations/${item.id}`, {method: 'DELETE'});
     if (state.id === item.id) resetConversation();
-    lastDeleted = item; $('history-notice').hidden = false;
+    showHistoryNotice(item);
     await refreshHistory();
   } catch (error) {showError(error.message);} finally {setBusy(false);}
 });
 $('undo-delete').addEventListener('click', async () => {
   if (state.busy || !lastDeleted) return;
+  const item = lastDeleted;
+  clearTimeout(historyNoticeTimer); historyNoticeTimer = null;
+  let restored = false;
   setBusy(true); showError();
   try {
-    await api(`/api/conversations/${lastDeleted.id}/restore`, {method: 'POST'});
-    lastDeleted = null; $('history-notice').hidden = true; await refreshHistory();
-  } catch (error) {showError(error.message);} finally {setBusy(false);}
+    await api(`/api/conversations/${item.id}/restore`, {method: 'POST'});
+    restored = true;
+    hideHistoryNotice(); await refreshHistory();
+  } catch (error) {if (!restored) showHistoryNotice(item); showError(error.message);} finally {setBusy(false);}
 });
 $('menu-button').addEventListener('click', () => {
   const open = $('sidebar').classList.toggle('open'); $('scrim').classList.toggle('open', open);
@@ -185,12 +201,13 @@ $('file-input').addEventListener('change', async () => {
   } catch (error) {showError(error.message);} finally {setBusy(false);}
 });
 $('question').addEventListener('keydown', event => {if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {event.preventDefault(); $('chat-form').requestSubmit();}});
-$('question').addEventListener('input', () => {$('question').style.height = 'auto'; $('question').style.height = `${Math.min($('question').scrollHeight, 180)}px`;});
+$('question').addEventListener('input', () => {$('question').style.height = 'auto'; $('question').style.height = `${Math.min($('question').scrollHeight, 240)}px`;});
 $('chat-form').addEventListener('submit', async event => {
   event.preventDefault(); if (state.busy) return;
   stopVoice();
   const draft = $('question').value; const draftHeight = $('question').style.height;
   const text = draft.trim(); if (!text && !state.attachments.length) { $('question').focus(); return; }
+  hideHistoryNotice();
   let committed = false;
   let stopProgress = () => {};
   const previous = [...state.messages]; const files = [...state.attachments];
@@ -223,16 +240,43 @@ for (const button of document.querySelectorAll('[data-question]')) {
 }
 async function initialize() {
   try {
-    const config = await api('/api/config'); agentName = config.name; $('footer-note').textContent = config.disclaimer;
-    config.quick_questions.forEach(item => {
-      const button = document.createElement('button'); button.className = 'suggestion'; button.type = 'button';
-      const copy = document.createElement('span'); copy.className = 'suggestion-copy';
-      const title = document.createElement('strong'); title.textContent = item.title; const caption = document.createElement('small'); caption.textContent = item.caption; copy.append(title, caption);
-      button.append(copy);
-      button.addEventListener('click', () => useQuestion(item.text)); $('suggestions').append(button);
+    const config = await api('/api/config'); agentName = config.name;
+    const taskIcons = [
+      '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5M8 8h5M8 11h3"/>',
+      '<path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6M9 16h5"/>',
+      '<path d="M12 4H5v16h15v-7M11 14l1-4 7-7 3 3-7 7-4 1Z"/>',
+      '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h1m6 0h1M8 16h1m6 0h1"/>',
+    ];
+    const categories = config.business_categories?.length ? config.business_categories
+      : [{title: '税收业务', questions: config.quick_questions}];
+    function selectCategory(selected) {
+      const category = categories[selected];
+      for (const [index, button] of [...$('business-tabs').children].entries()) button.setAttribute('aria-pressed', String(index === selected));
+      $('suggestions').replaceChildren(); $('suggestions').setAttribute('aria-label', `${category.title}事项`);
+      category.questions.forEach((item, index) => {
+        const button = document.createElement('button'); button.className = 'suggestion'; button.type = 'button'; button.disabled = state.busy;
+        const icon = document.createElement('span'); icon.className = 'suggestion-icon'; icon.setAttribute('aria-hidden', 'true');
+        icon.innerHTML = `<svg viewBox="0 0 24 24">${taskIcons[index % taskIcons.length]}</svg>`;
+        const copy = document.createElement('span'); copy.className = 'suggestion-copy';
+        const title = document.createElement('strong'); title.textContent = item.title; const caption = document.createElement('small'); caption.textContent = item.caption; copy.append(title, caption);
+        button.append(icon, copy);
+        button.addEventListener('click', () => useQuestion(item.text)); $('suggestions').append(button);
+      });
+    }
+    categories.forEach((category, index) => {
+      const button = document.createElement('button'); button.className = 'business-tab'; button.type = 'button';
+      button.textContent = category.title; button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {if (!state.busy) selectCategory(index);}); $('business-tabs').append(button);
     });
+    selectCategory(0);
     await refreshHistory();
     const remembered = localStorage.getItem('xiaochi-conversation'); if (remembered) await selectConversation(remembered);
   } catch (error) {showError('页面连接未完成，请刷新后重试。');}
 }
+// Pause decorative sprite work when this page is in the background.
+function syncMascotVisibility() {
+  $('brand-mascot').dataset.paused = String(document.hidden);
+}
+document.addEventListener('visibilitychange', syncMascotVisibility);
+syncMascotVisibility();
 initialize();

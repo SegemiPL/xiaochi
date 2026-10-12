@@ -1,0 +1,81 @@
+/* Original 1774 × 887 atlas, scaled uniformly by .21. The measured per-frame
+   centers and foot baselines compensate for the generated atlas's uneven grid.
+   Keep discrete frame changes; interpolating positions would slide the atlas. */
+.brand-mascot {
+  position: relative;
+  display: block;
+  flex: 0 0 80px;
+  width: 80px;
+  height: 95px;
+  isolation: isolate;
+}
+.brand-mascot::before {
+  content: "";
+  position: absolute;
+  inset: 15px 4px 3px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #bcd8ff29, #bcd8ff00 72%);
+}
+.mascot-sprite {
+  display: block;
+  width: 80px;
+  height: 95px;
+  background: url("./xiaochi-sprite.png") no-repeat -12.605px .1px / 372.54px 186.27px;
+  /* The preceding row's shoes reach y=1.57px during a wave. Clip the
+     inter-row guard band; the current head starts below y=4.7px. */
+  clip-path: inset(3px 0 1px);
+  transform-origin: 50% 95%;
+  animation: mascot-blink 5.6s steps(1, end) infinite, mascot-breathe 4s ease-in-out infinite;
+}
+.brand:focus-visible .mascot-sprite {
+  animation: mascot-wave .8s steps(1, end) 3, mascot-greet .8s ease-in-out 3;
+}
+@media (hover: hover) {
+  .brand:hover .mascot-sprite {
+    animation: mascot-wave .8s steps(1, end) 3, mascot-greet .8s ease-in-out 3;
+  }
+}
+.brand .brand-mascot[data-state="busy"] .mascot-sprite {
+  animation: mascot-blink 6.8s steps(1, end) infinite, mascot-think 2.6s ease-in-out infinite;
+}
+.mascot-dots {
+  position: absolute;
+  right: -1px;
+  top: 4px;
+  display: none;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #f2f7ff;
+  box-shadow: 0 1px 4px #112b4e22;
+}
+[data-state="busy"] .mascot-dots { display: flex; }
+.mascot-dots i { width: 3px; height: 3px; border-radius: 50%; background: #376e9f; animation: mascot-dot 1.2s ease-in-out infinite; }
+.mascot-dots i:nth-child(2) { animation-delay: .15s; }
+.mascot-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes mascot-blink {
+  0%, 89%, 100% { background-position: -12.605px .1px; }
+  90%, 94% { background-position: -102.59px .1px; }
+  92% { background-position: -191.945px .1px; }
+  96% { background-position: -281.615px .1px; }
+}
+@keyframes mascot-wave {
+  0%, 100% { background-position: -13.13px -90.83px; }
+  25% { background-position: -103.01px -90.83px; }
+  50% { background-position: -192.365px -90.83px; }
+  75% { background-position: -282.14px -90.83px; }
+}
+@keyframes mascot-breathe { 50% { transform: translateY(-1.5px) rotate(.6deg); } }
+@keyframes mascot-greet { 50% { transform: rotate(-2deg); } }
+@keyframes mascot-think { 50% { transform: rotate(-3deg) translateY(-1px); } }
+@keyframes mascot-dot { 50% { opacity: .4; transform: translateY(-2px); } }
+.brand-mascot[data-paused="true"] .mascot-sprite,
+.brand-mascot[data-paused="true"] .mascot-dots i { animation-play-state: paused; }
+@media (max-width: 760px) {
+  .sidebar:not(.open) .mascot-sprite, .sidebar:not(.open) .mascot-dots i { animation-play-state: paused; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand .mascot-sprite, .mascot-dots i { animation: none !important; transform: none; }
+  .brand .mascot-sprite { background-position: -12.605px .1px; }
+}

@@ -2,25 +2,27 @@
 
 `src/` 是当前运行时根目录，使用 qwen-agent 的 `FnCallAgent` 管理工具和内部对话。独立 Web 前端、FastAPI 服务与 CLI 共享同一 Agent 核心。
 
-[架构与资料流](docs/architecture.md) · [能力与验收状态](docs/agent-capability-roadmap.md)
+[完整部署教程](../README.zh-CN.md#详细部署教程) · [环境模板](../.env.example) · [语音配置](docs/voice.md) · [架构与资料流](docs/architecture.md) · [能力与验收状态](docs/agent-capability-roadmap.md)
 
 ## 启动
 
-仓库根目录 `.env` 的格式为 `DEEPSEEK_API_KEY=你的密钥`。`config/env.py` 使用固定仓库路径加载，禁止变量插值、保留现有环境变量，Web、CLI 和直接搜索调用共享配置。文件由 `.gitignore` 排除；本机已创建的文件权限为 0600，其他部署环境请自行设置文件权限。内容更新后重启服务。首次加载后搜索仍逐次读取当前进程环境，支持环境内轮换。
+首次部署可从根目录 `.env.example` 复制私有 `.env`，已有文件不要覆盖。仓库根目录 `.env` 的格式为 `DEEPSEEK_API_KEY=你的密钥`。`config/env.py` 使用固定仓库路径加载，禁止变量插值、保留现有环境变量，Web、CLI 和直接搜索调用共享配置。文件由 `.gitignore` 排除；本机已创建的文件权限为 0600，其他部署环境请自行设置文件权限。内容更新后重启服务。首次加载后搜索仍逐次读取当前进程环境，支持环境内轮换。
 
 在仓库根目录执行。需要 Python 3.11+；联网搜索和默认聊天复用 `DEEPSEEK_API_KEY`。程序自动加载仓库根目录 `.env`，也支持维护人员设置进程环境变量；已有环境变量优先，不应把密钥写入 YAML、浏览器或 Git。
 
 ```bash
-uv sync --project src
+uv sync --project src --python 3.12 --locked
 src/.venv/bin/python -m src.main                       # 默认 DeepSeek，Web 地址 127.0.0.1:8000
 src/.venv/bin/python -m src.main --cli                 # 只显示最终答复的终端界面
 src/.venv/bin/python -m src.main --port 8002
 src/.venv/bin/python -m src.main --provider kimi       # 需要 MOONSHOT_API_KEY
-src/.venv/bin/python -m src.main --provider local --model <model-name>
+src/.venv/bin/python -m src.main --provider local --model finance-27b
 src/.venv/bin/python -m src.main --llm-config path/to/my-llm.yaml --provider my-provider
 ```
 
 网页启动时加载 `.env`，但不创建模型，首条问题才加载模型配置；没有密钥也可预览界面。未配置模型时问题接口返回提示，不泄露配置路径或异常详情。CLI 在启动时加载模型。默认绑定 `127.0.0.1`，可通过 `--host` 指定已有受控部署的绑定地址。
+
+脚本启动用 `bash scripts/start-web.sh --port 8000`；不传端口时该脚本默认7860，只有脚本读取 `XIAOCHI_PORT`，直接启动默认8000。Fish 朗读可在根目录 `.env` 设置 `FISH_AUDIO_API_KEY`，不需要 ASR；语音输入另需准备外部 SenseVoice 环境并启动 `scripts/start-asr.sh`（8772端口）。**ASR 脚本不加载 `.env`**，使用终端导出的 `VOICE_ASR_REPO` / `VOICE_ASR_PYTHON` 或 `.local/voice.json` 配置路径，详见完整部署教程。
 
 当前为本地单用户应用，没有用户登录与权限隔离。原核心使用全局运行目录和附件会话状态，因此同一进程每次只处理一个问题；忙时返回重试提示，不应启用多个 workers。
 
@@ -118,11 +120,11 @@ SearXNG 工具、SAFE 站内搜索及 WebFetchTool 已删除，不再读取旧 d
 先安装开发依赖，再运行离线测试：
 
 ```bash
-uv sync --project src --extra dev
+uv sync --project src --python 3.12 --locked --extra dev
 src/.venv/bin/python -m pytest -q src/tests
 ```
 
-自动化测试包括多轮会话、历史投影、删除/撤销与运行互斥、附件隔离、最终答复提示、Markdown、进度与官方正文读取。2026-10-08 的 211 项离线回归通过；此前八个真实场景通过，包含一项基于官方正文的政策回归；广泛税务政策质量及 42 题评测尚未完成。完整状态见能力路线图。
+自动化测试包括多轮会话、历史投影、删除/撤销与运行互斥、附件隔离、最终答复提示、Markdown、进度与官方正文读取。2026-10-12 的 220 项离线回归通过；此前八个真实场景通过，包含一项基于官方正文的政策回归；广泛税务政策质量及 42 题评测尚未完成。完整状态见能力路线图。
 
 可复现真实模型迭代：
 

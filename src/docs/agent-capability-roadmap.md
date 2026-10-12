@@ -51,16 +51,16 @@
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
 | BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-10-07 | `src/agent/conversations.py` 保存内部与公开上下文，并支持移入 `.trash/` 删除和撤销恢复；`src/web/service.py`、`src/web/app.py` 对历史管理与运行互斥，API 仅返回公开记录；`src/tests/test_conversations.py`、`src/tests/test_xiaochi_web.py` 验证重启后仍删除、恢复原上下文/附件、其他记录不变及运行锁。尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-11 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成；ASR/TTS 保留：原生麦克风、结论口播、首句预生成与分段播放，见 `src/web/voice.py`、`src/web/static/voice.js`。 |
+| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-12 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成；ASR/TTS 保留：原生麦克风、结论口播、首句预生成与分段播放，见 `src/web/voice.py`、`src/web/static/voice.js`。 `src/voice/text.py`、`narration.py`、`client.py` 过滤仅展示的 AI 尾注，输入/模型输出/缓存/分段边界回归见 `src/tests/test_voice_narration.py`，220项测试通过；真实 DeepSeek/Fish 测试音频及口播文本见 `src/workspace/eval/voice-footer-2026-10-12.*`。 |
 
 ### 小弛产品重构（2026-10-07）
 
 | 编号 | 能力 | 状态 | 最后更新 | 实现证据与验收边界 |
 |---|---|---|---|---|
-| XIAOCHI-01 | 独立税务聊天前端 | ✅ 已完成 | 2026-10-08 | `src/web/static/`：依据用户汇小二截图调整为蓝白分区、细边框、小圆角和轻微阴影；左侧历史、中间咨询卡片、宽屏右侧官方政策入口/提问示例，窄屏保留主对话；补齐小弛品牌、官方入口标识与政策书册图标，本地资源及来源见 `src/web/static/icons/`，桌面/手机预览 `xiaochi-logos.jpg`、`xiaochi-logos-mobile.jpg`。每轮三个相关问题、历史/删除撤销、附件、复制与草稿行为保留；1280px桌面、1024px平板、390px手机检查无横向溢出，示例/推荐填入和历史切换正常；截图 `src/workspace/preview/xiaochi-refined-home.jpg`、`xiaochi-refined-answer.jpg`、`xiaochi-refined-mobile.jpg` |
-| XIAOCHI-02 | 税务部门角色、业务配置与报告模板 | 🟡 部分实现 | 2026-10-07 | `src/config/xiaochi.yaml`、`src/prompts/prompts.py` 与报告契约/模板；默认中国内地、结论在前、缺少条件先澄清。正确性与完整性优先，政策答案长度服从所需条件，不为提速强制拒答。`src/evals/xiaochi_smoke.py` 八个真实场景通过，含外籍个人分红正式文件、文号、执行日期、适用范围、税率和旧条款废止核验；一项政策回归不足以完成全面税务质量验收，参考站未成功加载 |
-| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-08 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复；`followups.py` 与 `test_followups.py` 验证推荐元数据不进入正文，非法/截断区块不暴露，思考/工具/专家不能提供推荐 |
-| XIAOCHI-04 | 本地 .env 加载与密钥隔离 | ✅ 已完成 | 2026-10-07 | `src/config/env.py` 固定仓库路径加载私有 `.env`、环境变量优先；聊天和搜索共享加载；`.gitignore` 覆盖且本机文件为 0600；`src/tests/test_env.py` 验证路径、优先级、共享凭据及缺失文件；真实调用验证成功，代码、报告及运行日志扫描未发现密钥值 |
+| XIAOCHI-01 | 独立税务聊天前端 | ✅ 已完成 | 2026-10-12 | `src/web/static/index.html`、`style.css`、`app.js`：深蓝侧栏、浅蓝咨询区、红色业务图标/标题强调和 SVG 资料装饰；入场、悬停、聚焦、蓝色等待转圈及录音状态动效，系统减少动态效果时全部停用。历史/附件/复制/三个推荐保留，删除提示8秒自动收起。浏览器检查1280px桌面、1024px平板、390px手机无横向溢出、首页卡片和输入区不重叠，业务入口/推荐填入与历史恢复正常；截图 `src/workspace/preview/xiaochi-blue-red-home.jpg`、`xiaochi-blue-red-answer.jpg`、`xiaochi-blue-red-mobile.jpg`。图标来源见 `src/web/static/icons/`，删除提示证据见实现记录 按浏览器反馈移除历史红边、品牌红线及右侧卡片顶部蓝红线；官方入口图标新增悬停/键盘聚焦抬起、缩放与扫光，验证截图 `src/workspace/preview/xiaochi-clean-accents.jpg`。 首页顶部与栏目标签装饰线移除；等待转圈与阶段/耗时并列，独立模拟预览证据 `src/workspace/preview/xiaochi-home-no-topline.jpg`、`xiaochi-waiting-spinner.jpg`。 侧栏新增用户参考形象生成的动态 Q 版小人，素材/样式/来源见 `src/web/static/mascot/`，状态接入 `app.js`；眨眼、挥手、忙碌恢复、后台/手机侧栏暂停及减少动态效果通过浏览器检查，1280/1024/390px 无溢出，17项 Web 测试通过；证据 `src/workspace/preview/xiaochi-mascot-check.json`。 首页新增税收/外汇/商务发改三类十二项入口、外汇局/发改委官方图标；输入框约190px高，移除上方标题与底部重复提示。1412/1024/390px无溢出与重叠，切换保留草稿、事项填入及历史恢复正常；证据 `src/workspace/preview/xiaochi-business-home.jpg`、`xiaochi-business-mobile.jpg`。 小人放大25%，通过帧间裁切修复挥手时头顶漏出的上一行鞋底，四帧及桌面/平板/手机复验见同检查记录。 |
+| XIAOCHI-02 | 税务部门角色、业务配置与报告模板 | 🟡 部分实现 | 2026-10-12 | `src/config/xiaochi.yaml`、`src/prompts/prompts.py` 与报告契约/模板；默认中国内地、结论在前、缺少条件先澄清。正确性与完整性优先，政策答案长度服从所需条件，不为提速强制拒答。`src/evals/xiaochi_smoke.py` 八个真实场景通过，含外籍个人分红正式文件、文号、执行日期、适用范围、税率和旧条款废止核验；一项政策回归不足以完成全面税务质量验收，参考站未成功加载 `business_categories` 与 `web/app.py` 增加三类业务入口配置，前端验证类别及草稿，不据此升级外汇/商务发改业务准确性验收。 |
+| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-12 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复；`followups.py` 与 `test_followups.py` 验证推荐元数据不进入正文，非法/截断区块不暴露，思考/工具/专家不能提供推荐 答复末尾统一提示保留，移除输入框下方重复提示，语音排除该尾注；`src/tests/test_voice_narration.py` 验证公开正文/HTML仍含提示、口播及TTS文本不含提示，业务限制保留。 |
+| XIAOCHI-04 | 本地 .env 加载与密钥隔离 | ✅ 已完成 | 2026-10-12 | `src/config/env.py` 固定仓库路径加载私有 `.env`、环境变量优先；聊天和搜索共享加载；`.gitignore` 覆盖且本机文件为 0600；`src/tests/test_env.py` 验证路径、优先级、共享凭据及缺失文件；真实调用验证成功，代码、报告及运行日志扫描未发现密钥值；部署模板 `.env.example` 仅含空凭据字段，`.gitignore` 显式允许模板并继续忽略私有环境文件；中英文 README 与运行/语音文档说明固定加载路径、环境优先级、密钥文件入口及 ASR 不加载 `.env` 的边界。环境与模型配置8项回归通过，启动帮助与无外部调用的配置检查通过 |
 | XIAOCHI-05 | 每轮三个相关问题 | ✅ 已完成 | 2026-10-08 | `src/agent/followups.py`、`public_answer.py`、`src/web/service.py`、`static/app.js`：同轮生成、严格校验、按场景兜底、公开历史持久化；不增加独立模型请求或工具流程。`src/tests/test_followups.py` 与 `test_xiaochi_web.py` 覆盖异常元数据、内部信息隔离、新答复/恢复/删除撤销；真实计算和虚拟材料两项均返回模型生成的三个问题，点击填入及刷新一致。广泛推荐质量仍需后续样本迭代 |
 
 这里的完成状态仅针对所述界面与输出边界；当前是串行执行的本地单用户应用，账号、部门权限与多人部署不在本轮验收范围。
@@ -488,3 +488,49 @@
 - 验证：Web/API、最终回答边界、追问、模型配置及语音接口的定向检查；语音只读取公开最终回答，不暴露中间 Agent 历史。新增 soundfile 与显式 tqdm 依赖，刷新 src/uv.lock。状态保持不变。
 
   合并实测：42 项定向检查通过；原生 `/api/voice/asr` 将示例 WAV 转写为“好的，你说。”；浏览器音频播放时间正常推进，显示“政策解读女声 · 1/3”，未观察到播放错误。
+
+### 2026-10-12：修复朗读页面 AI 参考提示
+
+- `BASE-06`、`XIAOCHI-03` 保持已完成，最后更新为2026-10-12。复现统一提示进入最终答复、口播输出和缓存的问题：新增五项回归在修复前全部失败。`src/voice/text.py` 仅剥离末尾的固定产品提示及大小写/人工智能变体；`client.py` 在读取答复和分段前过滤，`narration.py` 在模型输入、输出及缓存读取时过滤。口播提示词更新同步改变准备/口播缓存标识，避免复用旧音频准备结果。页面提示与业务条件、例外和不确定性保留，语音说明同步。
+- 验证：`src/tests/test_voice_narration.py` 七项回归涵盖提示变体、重复尾注、模型重新生成提示、缓存残留、业务限制与引用提示文字保留、真实接口准备/分段/公开HTML隔离；完整220项测试通过，改动模块定向Ruff及diff检查通过。真实DeepSeek整理及Fish合成使用一条无个人信息测试文本，口播不含AI提示且生成有效WAV；证据 `src/workspace/eval/voice-footer-2026-10-12.json`、`.wav`。本机8000端口服务已重启加载修复，未删除用户历史或缓存文件。
+
+### 2026-10-12：删除提示自动收起
+
+- `XIAOCHI-01` 保持已完成，最后更新为2026-10-12。`src/web/static/app.js` 将“已删除对话 · 撤销”改为8秒后自动收起；后续删除重置计时，切换/新建对话或有效发送时立即清理。点击撤销暂停计时，恢复失败重新给出8秒操作窗口，恢复成功后隐藏，即使后续列表刷新失败也不再次显示撤销。后端可恢复删除与用户记录保留策略不变。
+- 验证：真实浏览器使用新建临时记录确认提示立即出现、超时隐藏、撤销恢复成功并隐藏、新建立即隐藏；测试记录已移入可恢复删除区，原四条历史保留。`node --check src/web/static/app.js` 与 `git diff --check` 通过；截图 `src/workspace/preview/xiaochi-delete-notice-timeout.jpg`。本轮仅前端状态修复，不重复模型调用。
+
+### 2026-10-12：蓝红配色与适度动效
+
+- `XIAOCHI-01` 保持已完成，最后更新为2026-10-12。`src/web/static/style.css` 调整深蓝侧栏、浅蓝工作区与红色入口/标题强调，增加柔和渐变与悬停层次；`index.html` 使用代码 SVG 资料图形，`app.js` 为四个业务入口增加装饰图标。增加短入场、按钮轻微抬起、输入聚焦、答复入场、等待细线与录音反馈；首页虚线环缓慢转动，窄屏隐藏，`prefers-reduced-motion` 禁用所有动画和过渡。动效不更改 Agent 执行或表示完成百分比，中英文 README 与架构说明同步。
+- 验证：浏览器1280px桌面、1024px平板、390px手机无横向溢出，首页欢迎卡片/输入区无重叠；手机历史菜单、既有答复恢复、三个推荐、业务入口与推荐点击填入正常；DOM确认四个图标、装饰环/答复动画及减少动态效果规则存在。主要蓝/红入口文字及侧栏文字对比度超过4.5。`node --check`、`git diff --check` 通过。截图 `src/workspace/preview/xiaochi-blue-red-home.jpg`、`xiaochi-blue-red-answer.jpg`、`xiaochi-blue-red-mobile.jpg`；本轮无新模型调用，不重复模型质量评测。
+
+### 2026-10-12：收敛装饰线与政策图标动效
+
+- `XIAOCHI-01` 保持已完成，最后更新为2026-10-12。`src/web/static/index.html` 移除品牌名旁红线节点；`style.css` 移除历史选中项红色 inset 边线、两张右侧卡片顶部蓝/红伪元素，侧栏键盘焦点改为浅蓝。三个政策入口图标容器在悬停和键盘聚焦时轻微抬起、缩放，并进行一次扫光；图标原文件不变，系统减少动态效果时仍停用动画与过渡。
+- 验证：浏览器确认品牌线节点为0、选中历史阴影为none、两卡顶部伪元素content均为none；三个入口逐一键盘聚焦均触发icon-sheen，图标transform变化正常，页面无横向溢出。截图 `src/workspace/preview/xiaochi-clean-accents.jpg`；`git diff --check` 通过。纯样式调整，不重复模型调用。
+
+### 2026-10-12：取消首页线条并明确等待状态
+
+- `XIAOCHI-01` 保持已完成，最后更新为2026-10-12。`src/web/static/style.css` 删除欢迎卡片顶部红蓝线及“业务工作台”前的小横线；将不明确的红蓝伸缩线替换为阶段文字左侧的蓝色转圈，耗时排在阶段下方。保留现有真实阶段和计时逻辑、status语义以及减少动态效果设置；架构说明同步。
+- 验证：独立8001端口预览使用临时会话及12秒模拟Agent，不调用模型或Fish、不改用户历史；浏览器确认两处首页伪元素content为none、旧等待线为none、新转圈动画为waiting-spin且阶段/耗时仍显示；答复完成后转圈移除，发送按钮恢复可用。截图 `src/workspace/preview/xiaochi-home-no-topline.jpg`、`xiaochi-waiting-spinner.jpg`。`node --check`、`git diff --check` 通过。
+
+### 2026-10-12：Q 版动态品牌形象
+
+- `XIAOCHI-01` 保持已完成，最后更新为2026-10-12。使用内置 imagegen 根据用户人物插画生成透明 Q 版精灵图，保留长发、黑色上衣、项链及暖黄色长裤；生成提示、素材来源和 CSS/Lottie/Rive 方案比较记录在 `src/web/static/mascot/README.md`、`generation-prompt.txt`。`index.html` 替换侧栏字标，`mascot.css` 按实测帧中心/脚底基线校准，提供待机眨眼/轻呼吸、悬停与键盘聚焦三轮挥手、处理中歪头与三点提示；`app.js` 复用 busy 状态并监听页面可见性。减少动态效果时使用静态首帧，页面隐藏/手机侧栏关闭时暂停；无新增运行库，不表示模型思考过程或完成比例。
+- 验证：真实 Chromium 浏览器检查四帧眨眼和四帧挥手位置、键盘聚焦、处理中状态、成功和失败后恢复、减少动态效果、隐藏页面及手机侧栏暂停；1280×844、1024×844、390×844 无横向溢出，浏览器无脚本异常。对话接口由浏览器模拟，无真实模型调用或用户历史写入。`src/tests/test_xiaochi_web.py` 17项通过（两项既有依赖弃用警告），`node --check src/web/static/app.js` 与 `git diff --check` 通过。检查记录 `src/workspace/preview/xiaochi-mascot-check.json`；截图 `xiaochi-mascot-desktop.png`、`xiaochi-mascot-busy.png`、`xiaochi-mascot-mobile.png` 位于同目录。
+
+### 2026-10-12：多业务首页、官方入口与输入区调整
+
+- `XIAOCHI-01`、`XIAOCHI-03` 保持已完成，`XIAOCHI-02` 保持部分实现，最后更新均为2026-10-12。`config/xiaochi.yaml` 定义税收、外汇、商务发改三类共十二个问题草稿入口；`web/app.py` 公开类别配置，保留原四个quick_questions；`static/app.js` 切换类别保留草稿，事项点击填入且不自动发送。`index.html`、`style.css` 移除输入框上方“提出问题/可附相关材料”和独立页脚，正文最小高度112px、自动增长上限240px，整体约190px；答复末尾参考提示保留。外汇局和发改委标识从官网获得，原文件本地保存，来源见 `static/icons/README.md`。现有品牌动画保留，核心Agent流程未调整。
+- 验证：完整220项回归、Web模块Ruff、JavaScript语法和diff检查通过；浏览器1412×827桌面、1024×768平板、390×844手机无横向溢出、首页/输入区不重叠。五个政策图标加载成功，外汇/商务发改类别切换、草稿保留、事项填入与历史恢复正常；独立页脚与输入标题节点均不存在，历史答复仍含参考提示。截图 `src/workspace/preview/xiaochi-business-home.jpg`、`xiaochi-business-mobile.jpg`。服务已重启加载配置。本轮无新模型调用，不据首页入口扩大业务质量验收结论。
+
+### 2026-10-12：修复挥手帧串图并放大形象
+
+- `XIAOCHI-01` 状态保持已完成，最后更新为2026-10-12。用户截图中的头顶两点来自精灵图上一行鞋底漏入挥手视口。`src/web/static/mascot/mascot.css` 将素材与所有帧坐标统一放大25%，视口由64×76改为80×95；使用顶部3px、底部1px帧间裁切，保留当前人物头发/脚底并移除相邻行内容。`src/web/static/style.css` 同步收窄品牌区间距，适配当前副标题；素材说明同步。
+- 验证：逐一查看四个挥手帧截图，头顶残影消失、人物完整；浏览器复验眨眼/挥手、聚焦、忙碌成功与失败恢复、减少动态效果和隐藏暂停。1280/1024/390px页面与品牌区均无横向溢出。记录 `src/workspace/preview/xiaochi-mascot-check.json`、四张 `xiaochi-mascot-wave-*.png` 及桌面/手机截图；`git diff --check` 通过。本轮为CSS裁切与尺寸调整，不调用模型或改动用户对话。
+
+### 2026-10-12：详细部署教程与脱敏环境模板
+
+- `XIAOCHI-04` 保持已完成，最后更新为2026-10-12。新增根目录 `.env.example`，DeepSeek/Fish 凭据留空，并列出声线、搜索、代理及脚本端口的可选配置；`.gitignore` 仅放行模板，私有 `.env`、`.env.*` 和 `.local/` 仍被忽略。没有复制或更改本机真实密钥。
+- `README.zh-CN.md` 与 `README.md` 补齐 Git/uv/Python3.12、锁定依赖、API 导入、Web/CLI、Fish 朗读、外部 SenseVoice 环境/模型、Linux systemd/SSH 隧道、Windows、更新备份与故障排查；`src/README.md`、`src/docs/voice.md` 同步交叉链接和端口/ASR 环境边界。单用户共享历史与串行执行范围明确，未据文档升级多人部署或政策质量验收。
+- 验证：锁定依赖离线 dry-run 成功；文档内本地链接、代码块与 Bash 语法检查，启动 `--help`、Git ignore 检查和仅输出布尔状态/模型地址的密钥加载检查通过；`src/tests/test_env.py` 与 `src/tests/test_llm_config.py` 共8项通过。未安装额外语音环境、改动运行服务或执行服务器部署；Windows/systemd 示例依据实际入口核对，未在对应系统实机部署。

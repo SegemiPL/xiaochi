@@ -5,13 +5,14 @@ import re
 import wave
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, ProxyHandler, build_opener
+from urllib.request import ProxyHandler, Request, build_opener
 
 import numpy as np
 import soundfile as sf
 
 from .config import VoiceError, settings
 from .fish import FishSpeechEngine, NoRedirect
+from .text import without_ai_footer
 
 engine = FishSpeechEngine()
 
@@ -45,14 +46,14 @@ def transcribe(path):
 
 
 def plain_text(text):
-    text = re.sub(r'<details\b[^>]*>.*?</details>', '', str(text), flags=re.S | re.I)
-    text = re.sub(r'<think>.*?</think>', '', str(text), flags=re.S)
-    text = re.sub(r'```.*?```', '', text, flags=re.S)
+    text = re.sub(r'<details\b[^>]*>.*?</details>', '', str(text), flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<think>.*?</think>', '', str(text), flags=re.DOTALL)
+    text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
     text = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', text)
     text = re.sub(r'https?://\S+', '', text)
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'(?m)^\s*[#>]+\s*', '', text)
-    return re.sub(r'[*`_]', '', text).strip()
+    return without_ai_footer(re.sub(r'[*`_]', '', text))
 
 
 def final_answer(history, turn, conclusion_only=True):
