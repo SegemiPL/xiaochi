@@ -51,7 +51,7 @@
 | BASE-03 | 附件解析与定位 | 🟡 部分实现 | 2026-09-11 | 支持 PDF、DOCX、Excel、CSV、文本；不支持 Pages，复杂远程文件没有统一缓存索引 |
 | BASE-04 | 对话持久化 | 🟡 部分实现 | 2026-10-07 | `src/agent/conversations.py` 保存内部与公开上下文，并支持移入 `.trash/` 删除和撤销恢复；`src/web/service.py`、`src/web/app.py` 对历史管理与运行互斥，API 仅返回公开记录；`src/tests/test_conversations.py`、`src/tests/test_xiaochi_web.py` 验证重启后仍删除、恢复原上下文/附件、其他记录不变及运行锁。尚未保存结构化事实、结论、来源和计算状态 |
 | BASE-05 | 来源有效性与引用核验子代理 | 🟡 部分实现 | 2026-09-11 | 已有 Validate/Citation Verifier；主要处理 Markdown，尚无 claim-source 结构化契约 |
-| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-11 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成；ASR/TTS 保留：原生麦克风、结论口播、首句预生成与分段播放，见 `src/web/voice.py`、`src/web/static/voice.js`。 |
+| BASE-06 | CLI、独立 Web 前端与多模型兼容 | ✅ 已完成 | 2026-10-12 | 删除 Gradio 前端；`src/web/app.py`、`src/web/static/` 提供 FastAPI 与独立聊天页；`src/agent/public_answer.py`、`src/agent/cli.py` 统一只展示最终答复及 AI 提示；默认 DeepSeek，保留 Kimi/local；`src/tests/test_cli.py`、`src/tests/test_llm_config.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_web_search_integration.py` 覆盖接口与启动；`src/web/markdown.py` 与 `src/tests/test_markdown.py` 修复中文标点边界加粗，接口覆盖新答复和历史一致渲染；浏览器确认原问题及书名号开头的加粗标签为 strong、字重 700；`src/agent/progress.py`、`src/web/progress.py` 与前端提供真实阶段和耗时，194 项回归及浏览器检索进度/完成恢复检查通过；浏览器完成 1280×900/390×844 布局、等待与历史恢复验证（截图 `src/workspace/preview/`）。真实模型端到端质量验收仍记录在 BASE-01/CAP-01，不据界面通过推定完成；ASR/TTS 保留：原生麦克风、结论口播、首句预生成与分段播放，见 `src/web/voice.py`、`src/web/static/voice.js`。 `src/voice/text.py`、`narration.py`、`client.py` 过滤仅展示的 AI 尾注，输入/模型输出/缓存/分段边界回归见 `src/tests/test_voice_narration.py`，220项测试通过；真实 DeepSeek/Fish 测试音频及口播文本见 `src/workspace/eval/voice-footer-2026-10-12.*`。 |
 
 ### 小弛产品重构（2026-10-07）
 
@@ -59,7 +59,7 @@
 |---|---|---|---|---|
 | XIAOCHI-01 | 独立税务聊天前端 | ✅ 已完成 | 2026-10-08 | `src/web/static/`：依据用户汇小二截图调整为蓝白分区、细边框、小圆角和轻微阴影；左侧历史、中间咨询卡片、宽屏右侧官方政策入口/提问示例，窄屏保留主对话；补齐小弛品牌、官方入口标识与政策书册图标，本地资源及来源见 `src/web/static/icons/`，桌面/手机预览 `xiaochi-logos.jpg`、`xiaochi-logos-mobile.jpg`。每轮三个相关问题、历史/删除撤销、附件、复制与草稿行为保留；1280px桌面、1024px平板、390px手机检查无横向溢出，示例/推荐填入和历史切换正常；截图 `src/workspace/preview/xiaochi-refined-home.jpg`、`xiaochi-refined-answer.jpg`、`xiaochi-refined-mobile.jpg` |
 | XIAOCHI-02 | 税务部门角色、业务配置与报告模板 | 🟡 部分实现 | 2026-10-07 | `src/config/xiaochi.yaml`、`src/prompts/prompts.py` 与报告契约/模板；默认中国内地、结论在前、缺少条件先澄清。正确性与完整性优先，政策答案长度服从所需条件，不为提速强制拒答。`src/evals/xiaochi_smoke.py` 八个真实场景通过，含外籍个人分红正式文件、文号、执行日期、适用范围、税率和旧条款废止核验；一项政策回归不足以完成全面税务质量验收，参考站未成功加载 |
-| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-08 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复；`followups.py` 与 `test_followups.py` 验证推荐元数据不进入正文，非法/截断区块不暴露，思考/工具/专家不能提供推荐 |
+| XIAOCHI-03 | 最终答复展示与统一 AI 提示 | ✅ 已完成 | 2026-10-12 | `src/agent/public_answer.py`、`src/web/service.py`、`src/agent/conversations.py`、`src/agent/cli.py`；含思考/工具/专家输出的模拟 agent 验证后端不发送过程，恢复历史同样投影，提示语只追加一次；公开进度仅返回固定阶段、状态与耗时，UUID 区分请求并禁止跨对话查询，完成或失败冻结；`src/tests/test_progress.py`、`src/tests/test_public_answer.py`、`src/tests/test_xiaochi_web.py`、`src/tests/test_cli.py`，浏览器验证等待及最终答复；`followups.py` 与 `test_followups.py` 验证推荐元数据不进入正文，非法/截断区块不暴露，思考/工具/专家不能提供推荐；语音排除仅展示的 AI 尾注，`src/tests/test_voice_narration.py` 覆盖公开正文保留提示及口播/缓存/分段过滤，业务限制保留 |
 | XIAOCHI-04 | 本地 .env 加载与密钥隔离 | ✅ 已完成 | 2026-10-07 | `src/config/env.py` 固定仓库路径加载私有 `.env`、环境变量优先；聊天和搜索共享加载；`.gitignore` 覆盖且本机文件为 0600；`src/tests/test_env.py` 验证路径、优先级、共享凭据及缺失文件；真实调用验证成功，代码、报告及运行日志扫描未发现密钥值 |
 | XIAOCHI-05 | 每轮三个相关问题 | ✅ 已完成 | 2026-10-08 | `src/agent/followups.py`、`public_answer.py`、`src/web/service.py`、`static/app.js`：同轮生成、严格校验、按场景兜底、公开历史持久化；不增加独立模型请求或工具流程。`src/tests/test_followups.py` 与 `test_xiaochi_web.py` 覆盖异常元数据、内部信息隔离、新答复/恢复/删除撤销；真实计算和虚拟材料两项均返回模型生成的三个问题，点击填入及刷新一致。广泛推荐质量仍需后续样本迭代 |
 
@@ -488,3 +488,8 @@
 - 验证：Web/API、最终回答边界、追问、模型配置及语音接口的定向检查；语音只读取公开最终回答，不暴露中间 Agent 历史。新增 soundfile 与显式 tqdm 依赖，刷新 src/uv.lock。状态保持不变。
 
   合并实测：42 项定向检查通过；原生 `/api/voice/asr` 将示例 WAV 转写为“好的，你说。”；浏览器音频播放时间正常推进，显示“政策解读女声 · 1/3”，未观察到播放错误。
+
+### 2026-10-12：修复朗读页面 AI 参考提示
+
+- `BASE-06`、`XIAOCHI-03` 保持已完成，最后更新为2026-10-12。复现统一提示进入最终答复、口播输出和缓存的问题：新增五项回归在修复前全部失败。`src/voice/text.py` 仅剥离末尾的固定产品提示及大小写/人工智能变体；`client.py` 在读取答复和分段前过滤，`narration.py` 在模型输入、输出及缓存读取时过滤。口播提示词更新同步改变准备/口播缓存标识，避免复用旧音频准备结果。页面提示与业务条件、例外和不确定性保留，语音说明同步。
+- 验证：`src/tests/test_voice_narration.py` 七项回归涵盖提示变体、重复尾注、模型重新生成提示、缓存残留、业务限制与引用提示文字保留、真实接口准备/分段/公开HTML隔离；完整220项测试通过，改动模块定向Ruff及diff检查通过。真实DeepSeek整理及Fish合成使用一条无个人信息测试文本，口播不含AI提示且生成有效WAV；证据 `src/workspace/eval/voice-footer-2026-10-12.json`、`.wav`。本机8000端口服务已重启加载修复，未删除用户历史或缓存文件。
